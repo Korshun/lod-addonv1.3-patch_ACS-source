@@ -169,7 +169,7 @@ int introchecker = 0;
 int botweapon = 0;
 int GBKills = 0;
 
-int PlayerTeamArray[64]; // 0 = null, 1 = human team, 2 = ghoul team
+int PlayerTeamArray[MaxPlayers]; // TODO: add constants. 0 = null, 1 = human team, 2 = ghoul team
 
 // Current page the player is browsing
 int alist_page[MaxPlayers];
