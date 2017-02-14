@@ -188,7 +188,7 @@ Global int 36: HunterArrowCounter[];
 global int 52: gvh_listtoggle[];
 
 // Empty arrays
-int StartTime[33];
+int StartTime[MaxPlayers];
 int buttons[MaxPlayers];
 int Playerstun[MaxPlayers];
 int IcefiendCloaking[MaxPlayers];
