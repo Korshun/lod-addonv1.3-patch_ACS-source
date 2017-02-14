@@ -162,13 +162,6 @@ struct morg_data {
 	int angle;
 };
 
-// Variables
-int scorecounter;
-int multikillcheck;
-int introchecker = 0;
-int botweapon = 0;
-int GBKills = 0;
-
 int PlayerTeamArray[MaxPlayers]; // TODO: add constants. 0 = null, 1 = human team, 2 = ghoul team
 
 // Current page the player is browsing
@@ -193,7 +186,6 @@ int buttons[MaxPlayers];
 int Playerstun[MaxPlayers];
 int IcefiendCloaking[MaxPlayers];
 int TotalMapKills[MaxPlayers + 1];
-int AchieveListOn[MaxPlayers + 1];
 int DispenserAmmoGiven[MaxPlayers][MaxPlayers][DSP_MaxSlot]; // Dispenser#, Player#, Ammo
 int TerminateScript[1000];
 int HookCount[MaxPlayers];
