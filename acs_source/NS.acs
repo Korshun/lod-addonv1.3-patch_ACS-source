@@ -3370,17 +3370,17 @@ Script 801 (int tid)
 // Kill one of the two campers
 Script 802 (void)
 {
-	int i;
+	int player;
 	if (random(1,2) == 1)
-		for (i = 1000; i < 1032; i++)
-			if (GetActorProperty(i, APROP_HEALTH) > 0) {
-				Thing_Damage(i, 100000, 0);
+		for (player = 0; player < MaxPlayers; player++)
+			if (GetActorProperty(PlayerTid(player), APROP_HEALTH) > 0) {
+				Thing_Damage(PlayerTid(player), 100000, 0);
 				Terminate;
 			}
 	else
-		for (i = 1031; i >= 1000; i--)
-			if (GetActorProperty(i, APROP_HEALTH) > 0) {
-				Thing_Damage(i, 100000, 0);
+		for (player = MaxPlayers - 1; player >= 0; player--)
+			if (GetActorProperty(PlayerTid(player), APROP_HEALTH) > 0) {
+				Thing_Damage(PlayerTid(player), 100000, 0);
 				Terminate;
 			}
 }
