@@ -1,0 +1,4403 @@
+// Fixing Ivan's ACS bullshit
+
+#encryptstrings
+#library "NS"
+#include "zcommon.acs"
+
+////////////////////////////////////////////////////////////////////////////////
+//                                   Defines                                  //
+////////////////////////////////////////////////////////////////////////////////
+// TID based stuff
+#define INT_MAX 0x7fffffff
+#define MaxPlayers 64
+#define TID_Start 1000
+#define TID_DispenserStart 1100
+#define TID_SentryStart 1200
+#define TID_AntihackStop 2000
+#define TID_Antihack 2001
+
+// Misc constants
+#define NS_DeathHintsTotal 54
+#define PROT_PUSH 30
+#define PROT_PUSHADD 20
+
+// Class based constants
+#define NS_CyborgScreenTime 600.0
+
+#define sjasteleporttid 5090
+#define sjasteleportimg 5190
+#define MorgDisplacerTID 6000
+
+// Advert constants
+#define NS_AdvertLineID 200
+#define NS_AdvertTotal 5
+
+// HUDMSG ID constants
+#define NS_AchieveListDisplayStart 1000
+#define NS_AchieveMsgBottomRank 14993
+#define NS_AchieveMsgBottomText 14994
+#define NS_AchieveMsgBottomName 14995
+#define NS_AchieveMsgBottomImage 14996
+#define NS_AchieveMsgBottomTitle 14997
+#define NS_AchieveImg 14998
+#define NS_AchieveMsgTop 14999
+#define NS_HudMessageID 15000
+#define NS_HudMessagePoisonID 15001
+#define NS_DeathMsgID 15002
+#define NS_GBUpgradeMsg 15003
+#define NS_DispenseMsg 15004
+#define NS_DispenseMsg2 15005
+#define NS_DispenseMsg3 15006
+#define NS_DispenseMsg4 15007
+#define NS_DispenserHudMsg 15101
+#define NS_SentryHudMsg 15009
+#define NS_HealMsg 15010
+#define NS_CyborgHUDID 15100
+#define NS_CyborgGridID 17000
+#define NS_AchieveListStartID 1200 // check for bug
+#define ALLYDISPLAYMAXDIST 3000
+
+// Achievement constants
+#define NS_AchievementTotal 140
+#define NS_AchievementHoldTime 5.0
+#define NS_AchievementListHoldTime 5.0
+#define NS_AchievementMultiMax 255
+#define NS_AchievementArrayMax 17
+#define NS_ACHIEVETYPES 5
+#define NS_ACHIEVE_NAME 0
+#define NS_ACHIEVE_IMAGE 1
+#define NS_ACHIEVE_TEXT 2
+#define NS_ACHIEVE_DIFFICULTY 3
+#define NS_ACHIEVE_SOUND 4
+
+// Class constants
+#define CLASSID_NONE 0
+#define CLASSID_MARINE 1
+#define CLASSID_HUNTER 2
+#define CLASSID_CYBORG 3
+#define CLASSID_GHOSTBUSTER 4
+#define CLASSID_ENGINEER 5
+#define CLASSID_WITCH 6
+#define CLASSID_WARLOCK 7
+#define CLASSID_PLANEWALKER 8
+#define CLASSID_PROTECTOR 9
+#define CLASSID_SJAS 10
+#define CLASSID_JITTERSKULL 11
+#define CLASSID_CREEPER 12
+#define CLASSID_CHOKE 13
+#define CLASSID_FROSTBITE 14
+#define CLASSID_NIGHTMARE 15
+#define CLASSID_DEFILER 16
+#define CLASSID_MOHOPH 17
+#define CLASSID_MORGWYR 18
+
+#define NS_CLASS_MAX 18
+
+// Ghostbuster upgrade constants
+#define GB_UPGRADE_SJAS 1
+#define GB_UPGRADE_JITTERSKULL 2
+#define GB_UPGRADE_CREEPER 3
+#define GB_UPGRADE_CHOKE 4
+#define GB_UPGRADE_FROSTBITE 5
+#define GB_UPGRADE_DEFILER 6
+#define GB_UPGRADE_ICEFIEND 7
+#define GB_UPGRADE_MOHOPH 8
+#define GB_UPGRADE_MORGWYR 9
+#define GB_UPGRADETOTAL 9
+
+// Dispenser ammo constants
+#define DSP_MAXEDOUT -1
+#define DSP_CANTGIVEMORE 0
+#define DSP_MaxSlot 4
+
+// Force actor state
+#define FAS_CyborgPulse 0
+#define FAS_FrostShards 1
+#define FAS_ChokeVomit 2
+#define FAS_ChokeBloodFeast 3
+#define FAS_WarlockTeleport 4
+
+#define PROTECTOR_DASH_ENERGY 20
+
+// Achievement constants
+#define NS_ACHIEVE_LOCKIMAGE 1
+
+// Achievement list related constants
+#define alist_maxitems 16
+#define alist_maxpage 18
+
+#define MORG_TIME_SHIFT 2
+#define TIME_SHIFT_SAVE_TICS 5
+#define TICS_PER_SECOND 35
+#define TIME_ALLOWANCE 2
+#define BASE_TIME_STORE (MORG_TIME_SHIFT * TICS_PER_SECOND / TIME_SHIFT_SAVE_TICS)
+#define MORG_TIME_STORAGE BASE_TIME_STORE * TIME_ALLOWANCE
+
+#define ENGINEER_RECHARGE_TIME 5
+#define LOOP_ITER_TICS 5
+#define ENGINEER_RECHARGE_COUNT ENGINEER_RECHARGE_TIME * TICS_PER_SECOND / LOOP_ITER_TICS
+
+#define NIGHTMARE_CLOAK_MAX 24
+
+#define WARLOCK_MALEDICT_COOLDOWN 5
+#define WARLOCK_SHADOWSTEP_COOLDOWN 9
+
+#define PLANESWALKER_VORTEX_COOLDOWN 3
+#define PLANESWALKER_DASH_COOLDOWN 6
+
+#define CREEPER_DRAINBALL_COOLDOWN 10
+
+#define FROSTBITE_MORTAR_COOLDOWN 3
+
+#define NIGHTMARE_CLOAK_COOLDOWN 4
+#define NIGHTMARE_CLEAVE_COOLDOWN 4
+
+struct pos {
+	int x, y, z;
+};
+
+struct morg_data {
+    struct pos mpos;
+	int hp;
+	int angle;
+};
+
+// Variables
+int scorecounter;
+int multikillcheck;
+int introchecker = 0;
+int botweapon = 0;
+int GBKills = 0;
+
+int PlayerTeamArray[64]; // 0 = null, 1 = human team, 2 = ghoul team
+
+// Current page the player is browsing
+int alist_page[MaxPlayers];
+str alist_category;
+
+// Global variables
+Global int 0: GlobalKillTotal[];
+
+Global int 1: global_achieves[];
+
+Global int 33: HunterFireCounter[];
+Global int 34: HunterIceCounter[];
+Global int 35: HunterLightningCounter[];
+Global int 36: HunterArrowCounter[];
+
+global int 52: gvh_listtoggle[];
+
+// Empty arrays
+int StartTime[33];
+int buttons[MaxPlayers];
+int Playerstun[MaxPlayers];
+int IcefiendCloaking[MaxPlayers];
+int TotalMapKills[MaxPlayers + 1];
+int AchieveListOn[MaxPlayers + 1];
+int DispenserAmmoGiven[MaxPlayers][MaxPlayers][DSP_MaxSlot]; // Dispenser#, Player#, Ammo
+int TerminateScript[1000];
+int HookCount[MaxPlayers];
+int WarlockSouls[MaxPlayers][2][2][2];
+
+// Morgwyr Time Shift stuff
+int morg_time_counter[MaxPlayers] = { 0 };
+struct morg_data prev_pos[MaxPlayers][MORG_TIME_STORAGE];
+
+// Filled Misc Arrays keep +1 than intended because of NULL
+
+str GB_UpgradeToken[GB_UPGRADETOTAL + 1] = { "NULL", "GBSjasUpgradeToken", "GBJitterskullUpgradeToken", "GBCreeperUpgradeToken", "GBChokeUpgradeToken", "GBFrostbiteUpgradeToken", "GBDefilerUpgradeToken", "GBIcefiendUpgradeToken", "GBMohophUpgradeToken", "GBMorgwyrUpgradeToken" };
+
+str GB_WeaponName[GB_UPGRADETOTAL + 1] = { "NULL", "Echo launcher", "Bone cannon", "Soul plasma", "Blood spewer", "Crystal rainer", "Rock launcher", "Horror cannon", "Randomizer", "Molecular Expander" };
+
+str GB_WeaponNameColor[GB_UPGRADETOTAL + 1] = { "NULL", "\ckEcho launcher", "\cjBone cannon", "\ccSoul plasma", "\cgBlood spewer", "\chCrystal rainer", "\csRock launcher", "\cmHorror cannon", "\cjR\cia\cgn\cvd\cfo\cmm\csi\ctz\cre\ckr", "\ciMolecular Expander" };
+
+str GB_WeaponUpgrade[GB_UPGRADETOTAL + 1] = { "NULL", "GhostbusterEcho", "GhostbusterBone", "GhostbusterSoul", "GhostbusterBlood", "GhostbusterIce", "GhostbusterRock", "GhostbusterHorror", "GhostBusterRandom", "GhostBusterExpander" };
+
+str NS_StringData[52] = { "\cjPrimary attack: \cdClaws (melee, powerful) \n\cjAlt fire: \cvDark Cleave (2 second cooldown) \n\cgSpecial Move: \cuInvisibility/Dim Vision",
+                          "\cjPrimary attack: \cdLunge (melee/jump, powerful) \nAlt fire: \cvFrozen Winds/Glacial Mortar (Switch Weapons to access)",
+                          "\cjPrimary attack: \cdImpale \n\cjAlt fire: \cvLeap of Faith \n\cfSpecial Trait: Can move up any height.",
+                          "\ckYou're now invisible, you cannot attack in this state \n\ckPress \cjfire \ckto uncloak in melee mode\n\ckPress \cjaltfire \ckto uncloak in spike mode\n\n\ckYour remaining cloak (seconds) is your ammo",
+                          "\cjPrimary attack: \cdShotgun \n\cjAlt fire: \cvRazor Blades \cg(Acts like Boomerangs, 20 EP)",
+                          "\cjPrimary attack: \cdCluster ice shards \n\cjAlt fire: \cvStream of ice shards",
+                          "\cjPrimary attack: \cdFire missile (1 ammo) \n\cjAlt fire: \cvFlame Trail (A ball that leaves pillars of flame at it's wake, 10 ammo)",
+						  "\cjPrimary attack: \cdShotgun \n\cjAlt fire: \cvShadow Dash \cg(Adds 50% more damage to your next attack, 50 EP)",
+						  "\cjPrimary attack: \cdShotgun \n\cjAlt fire: \cvVortex \cg(A bolt of darkness that rips through enemies, 40 EP)",
+						  "\cjPrimary attack: \cdVoid Trap (1 ammo) \n\cjAlt fire: \cvVoid Sphere (Shoots lightnings, 2 ammo per shot)",
+						  "\cjPrimary attack: \cdMunching \n\cjAlt fire: \cvBlood Ball/Vomit (Switch weapons to change modes)",
+                          "\cjPrimary attack: \cdExploding magic blast (1 ammo) \n\cgAlt Fire: \cfMaledict, \cuan incredibly powerful spell that causes the victims in an area to take damage over time and take increased damage",
+						  "\cjPrimary attack: \cdShotgun (7-8 pellets 5-10-15 damage each) \n\cjAlt fire: \cvGrenade (Hold for longer range, don't hold too much!)",
+						  "\cjPrimary attack: \cdAkimbo Pistols (5-10-15 damage each bullet) \n\cjAlt fire: \cvGrenade (Hold for longer range, don't hold too much!)",
+						  "\cjPrimary attack: \cdMachinegun (5-10-15 damage each bullet) \n\cjAlt fire: \cvGrenade (Hold for longer range, don't hold too much!)",
+						  "\cjPrimary attack: \cdNormal Bow (Fast arrow, no slowdown) \n\cjAlt fire: \cvMagic Blast (A circle of damaging magic)",
+						  "\cjPrimary attack: \cdFire Bow (Fast, explosive arrow) \n\cjAlt fire: \cvImmolation (Set yourself on fire)",
+						  "\cjPrimary attack: \cdIce Bow (Slow, volatile arrows) \n\cjAlt fire: \cvGlacial Spikes (Summon ice spikes around your path)",
+						  "\cjPrimary attack: \cdLightning Bow (Accurate lightning) \n\cjAlt fire: \cvLightning Circle (Summon spheres of electricity around you)",
+						  "\cjPrimary attack: \cdEnchanted Normal Bow (3 arrows spreading horizontally, no slowdown) \n\cjAlt fire: \cvShoots the arrows vertically",
+						  "\cjPrimary attack: \cdEnchanted Fire Bow (Very damaging arrow, no self damage)",
+						  "\cjPrimary attack: \cdEnchanted Ice Bow (Strong ice arrow with two spiralling ice particles, rains ice upon hit)",
+						  "\cjPrimary attack: \cdEnchanted Lightning Bow (5 Lightning shots with minimal spread)",
+						  "\cjPrimary attack: \cdPlasma Cannon (Slow, volatile plasma, \ckfires weaker ones when out of ammo\c-\cd)\ \n\cjAlt fire: \cvJetpack/Force Pulse (Switch weapons to change modes) \n\cgSpecial Move: \cuJetpack Dash (Press move keys and \cdActivate Item\c- \cukey)",
+						  "\cjPrimary attack: \cdProton Pack (Very fast stream of proton) \n\cjAlt fire: \cvUpgrade (Upgrades weapon according to the type of Ghoul you just killed)",
+						  "\cjPrimary attack: \cdEcho Launcher (Bouncing Energy) \n\cgSpecial Move: \cuDowngrade (Lose power to use Proton Pack again)",
+						  "\cjPrimary attack: \cdBone Cannon(Launches bone particles at tremendous speeds) \n\cgSpecial Move: \cuDowngrade (Lose power to use Proton Pack again)",
+						  "\cjPrimary attack: \cdBlood Spewer (Constant stream of blood) \n\cgSpecial Move: \cuDowngrade (Lose power to use Proton Pack again)",
+						  "\cjPrimary attack: \cdCrystal Rainer (Launch thick pieces of ice around you) \n\cgSpecial Move: \cuDowngrade (Lose power to use Proton Pack again)",
+						  "\cjPrimary attack: \cdSoul Plasma (Seeking missiles) \n\cgSpecial Move: \cuDowngrade (Lose power to use Proton Pack again)",
+						  "\cjPrimary attack: \cdHorror Cannon (Spreads, blinds) \n\cgSpecial Move: \cuDowngrade (Lose power to use Proton Pack again)",
+						  "\cjPrimary attack: \cdRock Launcher (Ball of rock dealing immense damage) \n\cgSpecial Move: \cuDowngrade (Lose power to use Proton Pack again)",
+						  "\cjPrimary attack: \cdLaser (Limited range, no ammo) \n\cjAlt fire: \cvTrap Line (Shoots 3 smaller particles that explode after a while)",
+						  "\cjPrimary attack: \cdHeartSeeker (Projectile shotgun) \n\cjAlt fire: \cvExplosive Cask (Explodes after bouncing twice)",
+						  "\cjPrimary attack: \cdDeath Darts (3 darts shot with triangular fashion) \n\cjAlt fire: \cvPoison Cask (Explodes after travelling a bit or hitting something)",
+						  "\cjPrimary attack: \cdGrappling Hook (Shoots, release with \cgActivate Item\c- \cdkey or breaks in 10 seconds) \n\cjAlt fire: \cvDeath Cask (Releases souls upon impact, heals for 2 hp per target hit)",
+						  "\cjPrimary attack: \cdNailgun (No ammo, clip system. 'Activate Item' to reload) \n\cjAlt fire: \cvBoth Barrels (Fires 2 nails at the same time)",
+						  "\cjPrimary attack: \cdPulverizer (Launch a boomerang of energy) \n\cjAlt fire: \cvDetonate (Detonates the ball)",
+						  "\cjPrimary attack: \cdWrench (Can place a Sentry (200), a Dispenser (100) or Drones (25)) \n\cjAlt fire: \cvSwitch Modes (Switch between Dispenser, Sentry or Drone modes)",
+						  "\cjPrimary attack: \cdScream \n\cjAlt fire: \cvReflect (Reflect all incoming projectiles) \n\cgSpecial Move: \cuTeleport Mark (\cdActivate Item\c- \cukey to put a mark)",
+						  "\cjPrimary attack: \cdNom \n\cjAlt fire: \cvWalk (Allows you to walk slowly but in a controlled manner)",
+						  "\cjPrimary attack: \cdSoul Steal (Heals you completely per kill) \n\cjAlt fire: \cvStun/Leech Balls (Stuns humans/Steals life from humans. Switch weapons to change modes)",
+						  "\cjPrimary attack: \cdGhost Traps (Detonates Traps) \n\cjAlt fire: \cvPlant Trap",
+						  "\cjPrimary attack: \cdNails \n\cjAlt fire: \cvVertical Burst (Shoots 4 nails in a vertical fashion)",
+						  "\cjPrimary attack: \cdSaw Launch (Let go of fire key to launch) \n\cjAlt fire: \cvBouncing Saw (Bounces 4 times before exploding)",				
+						  "\cjPrimary attack: \cdLunge (melee/jump, powerful) \n\cjAlt fire: \cvGlacial Mortar (A mine that explodes after a certain time or by detonation \cd(Alt fire key)\cv)",
+						  "\cjPrimary attack: \cdDeath's Embrace (melee/lunge) \n\cjAlt fire: \cvDisplacement/Bat Swarm (If you have attacked, return to where you were. If not, spawn a swarm of bats)\n\cgSpecial Move: \cuTime Shift (\cdActivate Item\c- \cukey to go back to where you were 2 seconds ago)",
+						  "\cjPrimary attack: \cdMissile (Accelerating explosives) \n\cjAlt fire: \cvEnergy Dash (Dash, direction depending on buttons pressed, 20 energy)",
+						  "\cjPrimary attack: \cdShock Blasts (two blasts per fire) \n\cjAlt fire: \cvEnergy Dash (Dash, direction depending on buttons pressed, 20 energy)",
+						  "\cjPrimary attack: \cdLightning Tracer (rings of energy, bounces 3 (4) times) \n\cjAlt fire: \cvEnergy Dash (Dash, direction depending on buttons pressed, 20 energy)",
+						  "\cjPrimary Attack: \cdExpander Beam (explosive beam, victims expand and explode) \n\cgSpecial Move: \cuDowngrade (Lose power to use Proton Pack again)",
+						  "\cjDummy Weapon: \cdYou are disguised! Your weapons do no damage!\nYou can transform back using your special power.\cj(\cdActivate Item\cj)"
+						};
+
+str NS_CyborgHud[4] = { "CYBVIS01", "CYBVIS02", "CYBVIS03", "CYBVIS04" };
+
+str NS_Achievement[NS_AchievementTotal][NS_ACHIEVETYPES] = {	{ "Still cleaning you up", "ACH_000", "Kill a creeper when your HP is less than 5", "\cgHard", "achievement\sound000" }, 
+																{ "Marksman", "ACH_001", "Kill 3 ghouls with lightning arrows", "\ckMedium", "achievement\sound001" }, 
+																{ "Ride the lightning", "ACH_002", "Kill 2 ghouls with 1 lightning arrow", "\c[rbw]IMPOSSIBRU", "achievement\sound002" } ,
+																{ "Jumping Jehosaphat", "ACH_003", "Jump 20 times", "\ckMedium", "" },
+																{ "Martyr", "ACH_004", "Suicide grenade a ghoul", "\cgHard", "achievement\sound004" },
+																{ "Grenadier", "ACH_005", "Kill 3 ghouls with grenades", "\cdEasy", "achievement\sound005" },
+																{ "Pistol Champ", "ACH_006", "Kill 3 ghouls with marine pistols", "\cgHard", "achievement\sound006" },
+																{ "Rampage!", "ACH_007", "20 Frags in one map", "\cmVery Hard", "achievement\sound007" }, 
+																{ "Indestructible!", "ACH_008", "10 frags in a single round", "\cvElite", "achievement\sound008" },
+																{ "Two is company", "ACH_009", "Kill 2 humans with one attack", "\cgHard", "" },
+																{ "Three is a crowd", "ACH_010", "Kill 3 humans with one attack", "\cmVery Hard", "" },
+																{ "Unspeakable Horror", "ACH_011", "Kill 3 humans while they are blinded", "\cgHard", "achievement\sound011" },
+																{ "Nailed", "ACH_012", "Kill 3 ghouls with the nailgun", "\ckMedium", "achievement\sound012" },
+																{ "Infernal Guardian", "ACH_013", "Kill 3 ghouls with super fire arrows", "\ckMedium", "achievement\sound013" },
+																{ "Cryomaster", "ACH_014", "Kill 3 ghouls with super ice arrows", "\ckMedium", "achievement\sound014" },
+																{ "No smoking", "ACH_015", "Kill 3 ghouls with the horror cannon", "\ckMedium", "achievement\sound015" },
+																{ "Haunting", "ACH_016", "Kill 5 humans as the Nightmare", "\cgHard", "achievement\sound016" },
+																{ "Assassination", "ACH_017", "Kill 3 humans with Nightmare's melee", "\ckMedium", "achievement\sound017" },
+																{ "Dinner Time", "ACH_018", "Kill 5 humans", "\cgHard", "" },
+																{ "Sawing Through", "ACH_019", "Kill 3 ghouls with the Saw Launcher", "\ckMedium", "" },
+																{ "Sharpshooting", "ACH_020", "Kill an impaler while it's leaping", "\cgHard", "" },
+																{ "6th Sense", "ACH_021", "Kill a planeswalker when he's invisible", "\cgHard", "" },
+																{ "Last Word", "ACH_022", "Kill a human in 2 seconds after your teleportation", "\cgHard", ""},
+																{ "Chompus Maximus", "ACH_023", "Frostbite melee 3 humans", "\cgHard", "achievement\sound023" },
+																{ "3 course meal", "ACH_024", "Digest 3 humans", "\ckMedium", "achievement\sound024" },
+																{ "Bloodbath", "ACH_025", "Kill 5 humans as choke", "\cgHard", "achievement\sound025" },
+																{ "Frozen demise", "ACH_026", "Kill 5 humans as frostbite", "\cgHard", "achievement\sound026" },
+																{ "Corpse parade", "ACH_027", "Kill 5 humans as sjas", "\cgHard", "achievement\sound027" },
+																{ "Fight ice with ice", "ACH_028", "Kill two frostbites with ice", "\ckMedium", "achievement\sound028" },
+																{ "Demoman", "ACH_029", "Kill two ghouls with one grenade", "\cmVery hard", "achievement\sound029" },
+																{ "Dinner for two", "ACH_030", "Jitter nom two humans at once", "\ckMedium", "achievement\sound030" },
+																{ "Grim reaper", "ACH_031", "Kill four main human types", "\cmVery hard", "achievement\sound031" }, 
+																{ "Hooked", "ACH_032", "Stay hooked for 30 seconds", "\ckMedium", "" },
+																{ "Eco-warrior", "ACH_033", "Kill 3 ghouls without using any fuel", "\cdEasy", "achievement\sound033" },
+																{ "Ear-Shocker", "ACH_034", "Kill two humans with one scream", "\ckMedium", "achievement\sound034" },
+																{ "Pyromaniac", "ACH_035", "Kill 3 ghouls with fire arrows", "\cgHard", "achievement\sound035" },
+																{ "Silence", "ACH_036", "Kill an Sjas in the 2 seconds after it's teleportation", "\cgHard", "" },
+																{ "Public Genocide", "ACH_037", "Get 3 kills without using stealth or dim vision", "\cmVery Hard", "" },
+																{ "Ghoul Slayer", "ACH_038", "Kill 4 ghouls with a shotgun", "\cgHard", "achievement\sound038" },
+																{ "Ice spammer", "ACH_039", "Kill 3 ghouls with ice arrows", "\cgHard", "achievement\sound039" },
+																{ "Low battery", "ACH_040", "Kill a ghoul with crap plasma", "\ckMedium", "achievement\sound040" },
+																{ "Master Craftsman", "ACH_041", "Get 5 kills as engineer", "\cgHard", "achievement\sound041" },
+																{ "Wanted!", "ACH_042", "Kill 5 humans as creeper", "\cgHard", "achievement\sound042" },
+																{ "To hell and back", "ACH_043", "Kill 7 ghouls with plasma", "\cvElite", "achievement\sound043" },
+																{ "Reborn", "ACH_044", "Heal as a creeper with 5 or less HP", "\cgHard", "achievement\sound044" },
+																{ "Meteor shower", "ACH_045", "Kill 3 ghouls with fireballs", "\cgHard", "achievement\sound045" },
+																{ "Shooting star", "ACH_046", "Kill 3 ghouls with the star launcher", "\cgHard", "achievement\sound046" },
+																{ "Satan's sniper (Part 1 of 3)", "ACH_047", "Kill two humans with blood balls", "\cdEasy", "achievement\sound047" },
+																{ "Balls of steel", "ACH_048", "Kill a human with creeper balls", "\cdEasy", "achievement\sound048" },
+																{ "Satan's sniper (Part 2 of 3)", "ACH_049", "Kill three humans with blood balls", "\ckMedium", "achievement\sound049" },
+																{ "It's a trap!", "ACH_050", "Kill 3 ghouls with ghostbuster traps", "\cgHard", "achievement\sound050" },
+																{ "Gunned Down", "ACH_051", "Kill 3 ghouls with the machinegun", "\cgHard", "achievement\sound051" },
+																{ "Who ya gonna call?", "ACH_052", "Kill 3 ghouls without upgrading", "\cgHard", "achievement\sound052" },
+																{ "Satan's sniper (Part 3 of 3)", "ACH_053", "Kill four humans with blood balls", "\cmVery Hard", "achievement\sound053" },
+																{ "Hungry for More", "ACH_054", "Nom 40 times", "\ckMedium", "" },
+																{ "Robin hood", "ACH_055", "Kill 3 ghouls with regular arrows", "\cmVery Hard", "achievement\sound055" },
+																{ "Lightning storm", "ACH_056", "Kill two ghouls with lightning magic", "\cgHard", "achievement\sound056" },
+																{ "Rise of the Machine", "ACH_057", "Kill two ghouls with the Drones", "\ckMedium", "" },
+																{ "Death's Embrace", "ACH_058", "Kill 2 humans with the cleave attack", "\cmVery hard", "achievement\sound058" },
+																{ "Last Whisper", "ACH_059", "Kill 5 ghouls with the shotgun", "\cgHard", "" },
+																{ "Lord of Planes", "ACH_060", "Kill a ghoul while invisible", "\cmVery Hard", "" },
+																{ "Dimension Bender", "ACH_061", "Kill 3 ghouls with the Vortex", "\ckMedium", "" },
+																{ "Eternal Frost", "ACH_062", "Kill 2 humans with the glacial mortars", "\ckMedium", "" },
+																{ "GvH God", "ACH_063", "Get 40 kills in one map", "\cvElite", "achievement\sound063" },
+																{ "Fire frenzy", "ACH_064", "Kill 5 ghouls with the fire upgrade", "\cmVery Hard", "achievement\sound064" },
+																{ "Lightning master", "ACH_065", "Kill 3 ghouls with the lightning upgrade", "\cgHard", "achievement\sound065" },
+																{ "Raining arrows", "ACH_066", "Kill 3 ghouls with the regular bow upgrade", "\cgHard", "achievement\sound066" },
+																{ "Two ghouls with one stone", "ACH_067", "Kill two ghouls with one fire arrow", "\cmVery Hard", "achievement\sound067" },
+																{ "Killing machine", "ACH_068", "Kill 5 ghouls as a cyborg", "\cgHard", "achievement\sound068" },
+																{ "Have an ice day", "ACH_069", "Kill 5 ghouls with ice streams", "\cgHard", "achievement\sound069" },
+																{ "Fine arts", "ACH_070", "Kill 3 ghouls with ice streams", "\ckMedium", "achievement\sound070" },
+																{ "Void Walker", "ACH_071", "Kill 3 ghouls with the warlock's void trap", "\cgHard", "achievement\sound071" },
+																{ "Alchemist", "ACH_072", "Kill 3 ghouls with your flasks", "\cgHard", "" },
+																{ "Jack of all trades", "ACH_073", "Kill one ghoul with each weapontype", "\ckMedium", "achievement\sound073" },
+																{ "Classic ghoul stomper", "ACH_074", "Kill all four classic ghouls in one round", "\cgHard", "achievement\sound074" },
+																{ "Elite human", "ACH_075", "Kill all ghoul classes in one round", "\cvElite", "achievement\sound075" },
+																{ "Elite ghoul", "ACH_076", "Kill all human classes in one round", "\cvElite", "achievement\sound076" },
+																{ "Crescendo", "ACH_077", "Kill 3 ghouls with sonic wave", "\ckMedium", "achievement\sound077" },
+																{ "Sharp Bone", "ACH_078", "Kill 3 ghouls with bone cannon", "\cgHard", "achievement\sound078" },
+																{ "Soul Collector", "ACH_079", "Kill 3 ghouls with soul plasma.", "\ckMedium", "achievement\sound079" },
+																{ "Hemosapien", "ACH_080", "Kill 3 ghouls with blood spray", "\ckMedium", "achievement\sound080" },
+																{ "Mr.Cool", "ACH_081", "Kill 3 ghouls with ice rain", "\ckMedium", "achievement\sound081" },
+																{ "Rocked", "ACH_082", "Kill 3 ghouls with the rock cannon", "\ckMedium", "achievement\sound082" },
+																{ "Bouncer", "ACH_083", "Kill 3 ghouls with your Pulverizer ball", "\cgHard", "" }, 
+																{ "Heart Sought", "ACH_084", "Kill 3 ghouls with the Heartseeker", "\ckMedium", "" },
+																{ "Acupuncture", "ACH_085", "Kill 3 ghouls with the Death Dart", "\cgHard", "" },
+																{ "Ruler of the Board", "ACH_086", "Get 30 frags in one map", "\cvElite", "achievement\sound086" },
+																{ "Sentry Overload", "ACH_087", "Have your sentry gun get 2 kills", "\cgHard", "achievement\sound089" }, // this is total derp but I failed sound names <.<
+																{ "Relentless Pursuit", "ACH_088", "Get 6 kills without using the flasks or the laser", "\cgHard", "" },
+																{ "Master of Utility", "ACH_089", "Get a kill with all your equipments", "\cvElite", "achievement\sound087" },
+																{ "Pure Hatred", "ACH_090", "Kill the class whose power you have claimed 2 more times", "\ckVery Hard", "" },
+																{ "The Night Beckons", "ACH_091", "Get at least 3 kills with all super arrow types", "\cmVery Hard", "achievement\sound091" },
+																{ "Dark Agent", "ACH_092", "Morph to 3 players you have killed", "\cgHard", "" },
+																{ "Damnation", "ACH_093", "Get at least 3 vomit kills", "\ckMedium", "achievement\sound093" },
+																{ "Bloody Side of Deimos", "ACH_094", "Get more than 1 kill with one blood ball", "\cvElite", "achievement\sound094" },
+																{ "Deep Terror", "ACH_095", "Get 5 kills as Mohoph", "\cgHard", "" },
+																{ "Welcome to my Bloodbath", "ACH_096", "Kill someone with your bloodbath", "\ckMedium", "achievement\sound096" },
+																{ "Lord of Magic", "ACH_097", "Get 3 magic kills of any kind", "\cmVery Hard", "achievement\sound097" },
+																{ "Twisted Menace", "ACH_098", "Get 2 kills in the 3 seconds of morphing back", "\cgHard", "" },
+																{ "Pulse Stopper", "ACH_099", "Get 3 kills with Force Pulse", "\cgHard", "achievement\sound099" },
+																{ "Exhausted", "ACH_100", "Use more than 600 energy", "\ckMedium", "" },
+																{ "Blademaster", "ACH_101", "Get 2 kills with the Blades", "\ckMedium", "" },
+																{ "Nope, no balls", "ACH_102", "Get 3 kills without using any of your balls", "\ckMedium", "achievement\sound102" },
+																{ "No rest", "ACH_103", "Get a kill in the 2 seconds of landing", "\ckMedium", "" },
+																{ "Skin O' My Teeth", "ACH_104", "Get 3 kills when you are below 10 hp", "\cgHard", "achievement\sound104" },
+																{ "Vlad the Impaler", "ACH_105", "Get 5 kills as Impaler", "\cgHard", "achievement\sound105" },
+																{ "Cross Over Loudly", "ACH_106", "Get 3 kills without using Reflect", "\cmVery Hard", "achievement\sound106" },
+																{ "Ammo Saver", "ACH_107", "Get 2+ kills without using any ammo", "\cmVery Hard", "achievement\sound107" },
+																{ "Tip Toe", "ACH_108", "Walk for 20 seconds", "\cdEasy", "" },
+																{ "Winter's Fury", "ACH_109", "Get 3 ice breath kills in less than 5 seconds", "\cmVery Hard", "achievement\sound109" },
+																{ "Life Leech", "ACH_110", "Get 2 kills with the Drain Balls", "\cgHard", "" },
+																{ "Rejuvenation", "ACH_111", "Regenerate over 100 health as Frostbite", "\cmVery Hard", "" },
+																{ "Doombringer", "ACH_112", "Get 3 kills with the cursed staff", "\cmVery Hard", "achievement\sound112" },
+																{ "Power Sap", "ACH_113", "Claim and use at least 4 ghoul powers", "\cmVery Hard", "" },
+																{ "Overcharge", "ACH_114", "Recharge 500 cells", "\ckMedium", "" },
+																{ "Ultimate Descendant", "ACH_115", "Claim all your powers as Mohoph", "\cvElite", "" },
+																{ "Missile Rain", "ACH_116", "Kill 3 ghouls with the missile launcher", "\ckMedium", "" },
+																{ "Ghoul BBQ", "ACH_117", "Kill 2+ ghouls with jetpack flames", "\cgHard", "achievement\sound117" },
+																{ "Lord Sjas", "ACH_118", "Kill 3 humans with 50+ hp", "\cgHard", "achievement\sound118" },
+																{ "Ocular Implants", "ACH_119", "Kill 2 stealthed Nightmares", "\ckMedium", "achievement\sound119" },
+																{ "D'Sparil's Apprentice", "ACH_120", "Kill 7 ghouls", "\cvElite", "\achievement\sound120" },
+																{ "Infinite Power", "ACH_121", "Consume 7 souls", "\cvElite", "\achievement\sound121" },
+																{ "War Factory", "ACH_122", "Get a kill with a level 3 sentry gun", "\cmVery Hard", "achievement\sound122" },
+																{ "Hunter's Moon", "ACH_123", "Kill 7 ghouls", "\cvElite", "\achievement\sound123" },
+																{ "GhoulBuster", "ACH_124", "Kill 7 ghouls", "\cvElite", "petertaunt" },
+																{ "Shocker", "ACH_125", "Kill 3 ghouls with the shock rifle", "\ckMedium", "" },														   
+																{ "Heaven's Light", "ACH_126", "Kill 3 ghouls with the lightning gun", "\cgHard", "" },
+																{ "Time Traveler", "ACH_127", "Dash at least 50 times", "\cdEasy", "" },
+																{ "Thunderpeak Ascendant", "ACH_128", "Kill 2 ghouls with one lightning shot", "\cmVery Hard", "" },
+																{ "Unholy Gaze", "ACH_129", "Kill 2 humans with a single charge", "\cgHard", "" },
+																{ "Death's Hand", "ACH_130", "Kill 5 humans as Morgwyr", "\cgHard", "" },
+																{ "Deceiver", "ACH_131", "Kill a human in the 1 second of you swapping places", "\ckMedium", "" },
+																{ "Bats of Doom", "ACH_132", "Kill 3 humans with the bats", "\cgHard", "" },
+																{ "Straightforward", "ACH_133", "Kill 3 humans without using your displacement", "\cgHard", "" }
+														   };
+
+// These show up on the achievement list
+int NS_AchievementListCategory[alist_maxpage+1][alist_maxitems] = {
+ { 4, 5, 6, 29, 38, 51, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 }, //Marine
+ { 2, 1, 35, 39, 55, 13, 14, 65, 66, 67, 56, 64, 91, 97, 123, -1 }, //Hunter
+ { 0, 33, 40, 43, 68, 99, 117, 114, -1, -1, -1, -1, -1, -1, -1, -1 }, //Cyborg
+ { 15, 50, 52, 77, 78, 79, 80, 81, 82, 113, 124, -1, -1, -1, -1, -1 }, //Ghostbuster
+ { 12, 41, 19, 87, 83, 57, 122, 89, -1, -1, -1, -1, -1, -1, -1, -1 }, //Engineer
+ { 32, 72, 84, 85, 88, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 }, //Witchhunter
+ { 45, 28, 69, 70, 71, 73, 112, 120, 121, -1, -1, -1, -1, -1, -1, -1 }, //Warlock
+ { 59, 60, 61, 100, 101, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 }, //Planeswalker
+ { 116, 125, 126, 127, 128, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 }, // Protector
+ { 27, 34, 118, 22, 106, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 }, //Sjas
+ { 24, 30, 18, 108, 54, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 }, //Jitterskull
+ { 42, 44, 48, 102, 110, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 }, //Creeper
+ { 25, 47, 49, 53, 93, 96, 94, -1, -1, -1, -1, -1, -1, -1, -1, -1 }, //Choke
+ { 23, 26, 62, 109, 111, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 }, //Frostbite
+ { 11, 16, 17, 58, 37, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 }, //Icefiend
+ { 105, 9, 10, 103, 3, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 }, //Impaler
+ { 90, 92, 95, 98, 115, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 }, //Mohoph
+ { 129, 130, 131, 132, 133, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 }, // Morgwyr
+ { 7, 86, 63, 8, 74, 75, 76, 104, 31, 119, 20, 21, 36, -1, -1, -1 } }; // Global
+ 
+str NS_AchievementListUnlockColor[2] = { "\cg", "\cd"};
+
+str NS_DeathHints[NS_DeathHintsTotal] = {	"A class' \cgSpecial Move\c- is used by using the \cdActive Item\c- key. Make sure you have it bound!",
+											"When you hear the PlanesWalker laugh, you should know that he is invisible and left a decoy behind him",
+											"Got any complaints or suggestions? Find us on IRC at #gvh",
+											"Cyborg dashing is done with \cdActive Item\c- button and the arrow keys",
+											"Cyborg vision requires you to set a key in Options > Customize Controls",
+											"Nightmare cloak mists cannot be seen by humans! Only other ghouls can see them (to show where you are)",
+											"The Warlock's fireballs are homing... but the mega-fireballs are not",
+											"Cyborg's energy pulse can be activated by switching to that mode via weapon switch. You can not use your jetpack while in this mode",
+											"After you use your dash as the PlanesWalker, your next attack will deal additional damage. Do not miss!",
+											"If you can't find a certain feature, it probably involves an unbound key or the \cdActive Item\c- key",
+											"To downgrade as the ghostbuster (if you need to), hit the \cdActive Item\c- key",
+											"If a Choke is chasing you, it's a better idea to run in weird directions so it can't block you",
+											"When a Sjas uses his reflect, hold your fire till it's over; then shoot him",
+											"Hunter upgrades cost them their magic attacks. Choose your weapon carefully",
+											"Cyborg vision can not be recharged, so use it wisely!",
+											"Cyborg vision will turn off after 2 minutes. You can re-enable it though any time you want",
+											"The Glacial Mortar of Frostbite can be a key move sometimes, use it to directly hit humans as much as denying an area!",
+											"The pulse for the cyborg damages nearby units and reflects all incoming attacks",
+											"Don't forget to upgrade the ghostbuster. All classes give you some kind of bonus",
+											"There's no best class in this mode. Each class is good against at least one other and they all have their unique traits",
+											"Witch Hunter's poison cask is a deadly tool if used properly. Anyone who passes through will suffer a ton",
+											"Set your \cdView Achievement List\c- bind in Customize Controls",
+											"Legacy of Darkness is the continuation of the Nordic Saga. Catastrophe and IvanDobrovski are the creators of this new version",
+											"Frostbite is not affected much by the ice arrows",
+											"Fire arrows do major damage to Frostbites",
+											"Clever use of the Pulverizer can save your life. Make good use of it's wild bouncing",
+											"Witch Hunter has many weapons for many situations, but they don't come with many ammunition. Use the ammo wisely",
+											"Marine and Engineer can reload manually by hitting your \cdActivate Item\c- key",
+											"As Creeper, you can easily switch weapons to change from stun mode to drain mode",
+											"Try to consume more than 3 souls as Warlock to claim your prizes. If you die when you had consumed 5 or more souls, you'll leave your own soul behind!",
+											"As Sjas, you really want to use your reflect attack carefully. It can leave you helpless when it's over!",
+											"As PlanesWalker, try to use your blades and then run back to make them cover more range",
+											"As Impaler, you can leap and then use your impale attack to kill people more efficiently",
+											"Try to coordinate with your allies as Nightmare, as a bad assault can cost you your life!",
+											"Jitterskull may seem scary, but if you can dodge it's attacks it becomes a very easy target!",
+											"As Marine, you get ammo satchels per kill you get. Use these to gain ammo ! Use previous/next item keys to switch between reload and satchels",
+											"Witch Hunter's grappling hook can be used for many purposes!",
+											"Try to use your Void Sphere agressively to repel attacks, or defensively to scare chasers",
+											"As Hunter, you can actually save your Enchant for when you really need against a tough opponent",
+											"As Choke, when you get 100 vomit points you will be able to unleash all the blood you gathered by simply using vomit mode",
+											"If a Creeper is ball spamming you, there's no reason to camp after he has used all his balls. Go chase him!",
+											"Don't use all your traps as Ghostbuster, as you may find yourself really desperate later in the round",
+											"As Creeper, you gain extra stacks of Drain Balls when you kill people. You start with 3 times of use in a round",
+											"As Frostbite, you can easily deny people from accessing certain areas with the use of Glacial Mortars",
+											"Nightmare has 2 inventory items, one for stealth and one for Dim Vision. Dim Vision blinds enemies near you for 2 seconds, and it refreshes if they stay near you!",
+											"After an impale attacks, it becomes very vulnerable! Use that to your advantage",
+											"Camping may seem viable, but most of the time you should be actively roaming around the map to ensure you don't get ganged up on",
+											"If the only enemy is a Creeper and you know it's camping, try to check the highly favored spots first. You can bait a creeper to come out with your footsteps as well!",
+											"Report any bug you find on #gvh, irc.zandronum.net",
+											"As always, you can find the changes in every patch in the patch file",
+										    "Engineer's sentries level up as he gets kills, each is better than the previous. Try to kill as many as you can",
+											"Mohoph gains power as he kills enemies. However, he has to kill distinct types of enemies for this to happen. Explore as you grow stronger!",
+											"Mohoph will heal himself to his maximum health each time he morphs to an enemy. However, he loses his resistances by doing so",
+											"Mohoph is immune to all curses or damage over time effects"
+										};
+
+str NS_Adverts[NS_AdvertTotal] = { "NSADV001", "NSADV002", "NSADV003", "NSADV004", "NSADV005" };
+
+str MohophPower[MaxPlayers][NS_CLASS_MAX/2] = { {0} };
+
+str MohophType[NS_CLASS_MAX/2] = { "\cg20% more damage!",
+					  "\cf15% more speed!",
+					  "\cvFlight!",
+					  "\c[f1]Distraction!",
+					  "\ci30% more range on attacks!",
+					  "\cu20% damage reduction!",
+					  "\c[lich]Additional morph per kill!",
+					  "\cd60% invisibility!",
+					  "\csthrusters!"
+					};
+
+////////////////////////////////////////////////////////////////////////////////
+//                                 Functions                                  //
+////////////////////////////////////////////////////////////////////////////////
+// Return the absolute
+Function int abs(int x) 
+{ 
+    if (x < 0) 
+        return -x; 
+    return x; 
+}
+
+// Square root function
+function int sqrt_z(int number)
+{
+	if(number <= 3)
+	{
+		if(number > 0)
+		{
+			return 1;
+		}
+		return 0;
+	}
+	
+	int oldAns = number >> 1,                     
+	    newAns = (oldAns + number / oldAns) >> 1; 
+	
+	while(newAns < oldAns)
+	{
+		oldAns = newAns;
+		newAns = (oldAns + number / oldAns) >> 1;
+	}
+
+	return oldAns;
+}
+
+// Returns the power value
+Function int power(int base, int exp)
+{
+	int y = 1;
+	while (exp-- > 0) 
+		y *= base;
+	return y;
+}
+
+// Gets the 2D distance
+Function int distance(int tid1, int tid2)
+{
+	int x, y;
+	x = (GetActorX(tid1) - GetActorX(tid2)) >> 16;
+	y = (GetActorY(tid1) - GetActorY(tid2)) >> 16;
+	return sqrt_z((x*x) + (y*y));
+}
+
+function int fdistance (int tid1, int tid2)
+{
+	int len;
+	int y = getactory(tid1) - getactory(tid2);
+	int x = getactorx(tid1) - getactorx(tid2);
+	int z = getactorz(tid1) - getactorz(tid2);
+
+	int ang = vectorangle(x,y);
+	if(((ang+0.125)%0.5) > 0.25) len = fixeddiv(y, sin(ang));
+	else len = fixeddiv(x, cos(ang));
+
+	ang = vectorangle(len, z);
+	if(((ang+0.125)%0.5) > 0.25) len = fixeddiv(z, sin(ang));
+	else len = fixeddiv(len, cos(ang));
+
+	return len;
+}
+
+// FROM AOW
+function int GetHealth (void) {return GetActorProperty (0, APROP_HEALTH);}
+
+// 3D distance function
+Function int distance3D(int x1, int y1, int z1, int tid)
+{
+	int len;
+	int x = (x1 * 1.0) - GetActorX(tid);
+	int y = (y1 * 1.0) - GetActorY(tid);
+	int z = (z1 * 1.0) - GetActorZ(tid);
+	int ang = VectorAngle(x, y);
+	if (((ang + 0.125) % 0.5) > 0.25) 
+		len = FixedDiv(y, sin(ang));
+	else len = FixedDiv(x, cos(ang));
+	ang = VectorAngle(len, z);
+	if (((ang + 0.125) % 0.5) > 0.25) 
+		len = FixedDiv(z, sin(ang));
+	else len = FixedDiv(len, cos(ang));
+	return (len / 1.0);
+}
+
+// Bypasses the random seed based on time
+Function int randInt(int low, int high)
+{
+	return (randIntEx(low, high, 0));
+}
+
+// Returns a random integer based on some random input
+Function int randIntEx(int low, int high, int val)
+{
+	int t = Timer(),
+		pc = PlayerCount();
+	return (random(low + t + pc + val, high + t + pc + val) - t - val - pc);
+}
+
+// Returns a random number based off time and player numbers
+Function int randIntPC(int low, int high)
+{
+	int t = Timer();
+	int p = PlayerCount();
+	return (random(low + t + p, high + t + p) - t - p);
+}
+
+// Gets the player number from tid (start at 0)
+Function int playerNumberFromTid(int tid)
+{
+	return (tid - TID_Start);
+}
+
+// Gets the player class
+Function int getPlayerClass(int tid)
+{
+	return CheckActorInventory(tid, "ClassID");
+}
+
+// Returns bool-ints depending on the player class
+Function int isPlayerClass(int tid, int classNum)
+{
+	return (getPlayerClass(tid) == classNum);
+}
+
+// Returns the degrees from a fixed point angle
+Function int degreesFromFixed(int fp)
+{
+	return ((fp * 360) / 1.0);
+}
+
+// Returns ammo to give, -1 means it's maxed out for that dispenser
+Function int dispenserAmmoToGive(int arraySlot, int ammoMaxToGive, int ammoMaximum, int dispenserMaxToGive, int currentAmmo, int playerNum, int dispenserNum)
+{
+	if (arraySlot >= DSP_MaxSlot) {
+		Log(s: "Warning, arraySlot > max slot [Function -> dispenserAmmoToGive]");
+		Print(s: "Warning, arraySlot > max slot [Function -> dispenserAmmoToGive]");
+	}
+	int ammoToGive = 0;
+	int ammoLeftToGive = 0;
+	if (currentAmmo == ammoMaximum)
+	{
+		if (DispenserAmmoGiven[dispenserNum][playerNum][arraySlot] == dispenserMaxToGive)
+			return DSP_MAXEDOUT;
+		else
+			return 0;
+	}
+	if (currentAmmo > ammoMaximum - ammoMaxToGive)
+		ammoToGive = ammoMaximum - currentAmmo;
+	else
+		ammoToGive = ammoMaxToGive;
+	if (DispenserAmmoGiven[dispenserNum][playerNum][arraySlot] < dispenserMaxToGive) {
+		if (dispenserMaxToGive - DispenserAmmoGiven[dispenserNum][playerNum][arraySlot] >= ammoMaxToGive)
+			DispenserAmmoGiven[dispenserNum][playerNum][arraySlot] += ammoToGive;
+		else {
+			if (dispenserMaxToGive - DispenserAmmoGiven[dispenserNum][playerNum][arraySlot] < ammoToGive)
+			ammoToGive = dispenserMaxToGive - DispenserAmmoGiven[dispenserNum][playerNum][arraySlot];
+			DispenserAmmoGiven[dispenserNum][playerNum][arraySlot] += ammoToGive;
+		}
+		//print(s: "Giving ", d: ammoToGive, s: "/", d: ammoMaxToGive, s: ", dispenser: ", d: DispenserAmmoGiven[dispenserNum][playerNum][0], s: "/", d: dispenserMaxToGive);
+		return ammoToGive;
+	} else
+		return DSP_MAXEDOUT;
+	return 0;
+}
+
+// Checks if in range of a number (boolean int)
+Function int inRange(int n, int m, int range)
+{
+	if (n == m)
+		return 1;
+	int high, low;
+	if (n > m) {
+		high = n;
+		low = m;
+	} else {
+		high = m;
+		low = n;
+	}
+	if (high - low <= range)
+		return 1;
+	return 0;
+}
+
+// Added compat for 64 players, really huge ass list...
+// Updates achievement number
+Function void updateAchievement(int achieveNum, int playerNum)
+{
+	  global_achieves[(playerNum*NS_AchievementTotal)+achieveNum] = 1;
+}
+
+// Reset player data
+Function void resetPlayerData(int playerNum)
+{
+	int i;
+	for(i = 0; i < NS_AchievementTotal; i++)
+		global_achieves[(playerNum*NS_AchievementTotal)+i] = 0;
+	GlobalKillTotal[playerNum] = 0;
+}
+
+// Checks if the achievement is unlocked
+Function int checkAchievementUnlocked(int achieveNum, int playerNum)
+{
+	return global_achieves[(playerNum*NS_AchievementTotal)+achieveNum];
+}
+
+function int magnitudeThree(int x, int y, int z)
+{
+    return sqrt_z(x*x + y*y + z*z);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//                            Nordic Saga Scripts                             //
+////////////////////////////////////////////////////////////////////////////////
+
+Script 450 (int angle, int force) // For hunter icespike and lightning magic
+{
+		ThrustThing(angle*256/360, force, 0, 0);
+		Delay(20);
+		ThrustThing(angle*256/360+128, force*2, 0, 0);
+}
+
+Script 451 (int force)
+{
+	ThrustThing(GetActorAngle(0)*256/360 + random(64,192), force*2, 0, 0);
+}
+
+Script 452 (int achieveNum) CLIENTSIDE
+{
+	if(GetCVAR("gvh_noachievesound") == 1)
+		Terminate;
+	AmbientSound(NS_Achievement[achieveNum][NS_ACHIEVE_SOUND], 127);
+}
+
+Script 453 (int tid, int angle)
+{
+	SpawnProjectile(tid, "IceTracer", angle*256/360, 280, 0, 1, 0);
+}
+
+Script 455 (void) // Medikit health check script
+{
+	int class = CheckInventory("ClassID");
+	switch (class) {
+	case CLASSID_MARINE:
+	case CLASSID_HUNTER:
+	case CLASSID_CYBORG:
+	case CLASSID_GHOSTBUSTER:
+	case CLASSID_WITCH:
+	case CLASSID_ENGINEER:
+	case CLASSID_WARLOCK:
+	case CLASSID_PROTECTOR:
+		if(GetActorProperty(0, APROP_HEALTH) == 100)
+			SetResultValue(1);
+		else
+			SetResultValue(0);
+	break;
+	case CLASSID_PLANEWALKER:
+		if(GetActorProperty(0, APROP_HEALTH) == 120)
+			SetResultValue(1);
+		else
+			SetResultValue(0);
+	break;
+	}
+}
+
+Script 499 (int type)
+{
+	if(type == 0)
+		SetActorProperty(0, APROP_SPEED, 1.1); 
+	else
+		SetActorProperty(0, APROP_SPEED, 0.909);
+}
+
+// Impaler Scripts
+
+script 500 (void)
+{
+	SetActorVelocity(0, 0, 0, 0, 0, 0);
+	SetPlayerProperty(0, 1, PROP_FROZEN);
+	SetActorState(0, "Missile", 0);
+	delay(42);
+	SetPlayerProperty(0, 0, PROP_FROZEN);
+}
+
+script 501 (void)
+{
+	ThrustThing(GetActorAngle(0) >> 8, 20, 1, 0);
+	ThrustThingZ(0, 50, 0, 1);
+	giveinventory("leapcooldown", 1);
+	giveinventory("busyflying", 1);
+	delay(1);
+	acs_executealways(502, 0, 0, 0, 0);
+
+	setfont("smallfont");
+	hudmessage(s:"Cooldown: 6 " ; HUDMSG_PLAIN, 669, CR_Red, 1.5, -0.90, 5.5, 1.0, 1.0);
+	delay(35);
+	setfont("smallfont");
+	hudmessage(s:"Cooldown: 5 " ; HUDMSG_PLAIN, 669, CR_Red, 1.5, -0.90, 5.5, 1.0, 1.0);
+	delay(35);
+	setfont("smallfont");
+	hudmessage(s:"Cooldown: 4 " ; HUDMSG_PLAIN, 669, CR_Red, 1.5, -0.90, 5.5, 1.0, 1.0);
+	delay(35);
+	setfont("smallfont");
+	hudmessage(s:"Cooldown: 3 " ; HUDMSG_PLAIN, 669, CR_Red, 1.5, -0.90, 5.5, 1.0, 1.0);
+	delay(35);
+	setfont("smallfont");
+	hudmessage(s:"Cooldown: 2 " ; HUDMSG_PLAIN, 669, CR_Red, 1.5, -0.90, 5.5, 1.0, 1.0);
+	delay(35);
+	setfont("smallfont");
+	hudmessage(s:"Cooldown: 1 " ; HUDMSG_PLAIN, 669, CR_Red, 1.5, -0.90, 5.5, 1.0, 1.0);
+	delay(35);
+	hudmessage(s:" " ; HUDMSG_PLAIN, 669, CR_Red, 1.5, -0.90, 5.5, 1.0, 1.0);
+	takeinventory("leapcooldown", 1);
+}
+
+script 502 (void)
+{
+	if(GetActorZ(0) == GetActorFloorZ(0))
+	{
+		giveinventory("leapoffaith2", 1);
+		GiveInventory("ImpalerLanded", 1);
+		delay(15);
+		takeinventory("busyflying", 1);
+		Delay(55);
+		TakeInventory("ImpalerLanded", 1);
+		terminate;
+	}
+
+	delay(1);
+	restart;
+}
+
+script 503 (void) // Stop to fix desync
+{
+	SetActorVelocity(0, 0, 0, 0, 0, 0);
+}
+
+Script 504 (int amount) // Level the drone up if needed
+{
+	GiveActorInventory(ActivatorTID()+501, "DLeveledup", amount);
+}
+
+// By IjonTichy, modified by Ivan
+
+Script 510 (void)
+{
+	int myx, myy, myz;
+	int vx, vy, vz, magnitude, nx, ny, nz;
+	int Letgo = false;
+	myx = GetActorX(0);
+	myy = GetActorY(0);
+	myz = GetActorZ(0);
+	
+	SetActivatorToTarget(0); // Player
+	Thing_ChangeTID(1800, 1000+ActivatorTID());
+	
+	while(!Letgo)
+	{
+		vx = myx - GetActorX(ActivatorTID());
+		vy = myy - GetActorY(ActivatorTID());
+		vz = myz - GetActorZ(ActivatorTID());
+
+        magnitude = magnitudeThree(vx >> 16, vy >> 16, vz >> 16);
+
+        if (magnitude != 0)
+        {
+            nx = vx / magnitude; ny = vy / magnitude; nz = vz / magnitude;
+            ACS_ExecuteAlways(511, 0, 1000+ActivatorTID(), ActivatorTID(), 16);
+        }
+        else
+        {
+            nx = 0; ny = 0; nz = 0;
+        }
+		
+		SetActorVelocity(0, nx*2, ny*2, nz*2, true, true);
+
+		Delay(1);
+		GiveInventory("Iterating", 1);
+        if (CheckInventory("MustLetGo"))
+            Letgo = true;
+		else
+		if (CheckInventory("Iterating") >= 35*10)
+		{
+			ActivatorSound("WH/HookHit", 127);
+			Letgo = True;
+		}
+		
+		if(CheckInventory("Iterating") % 35 == 0)
+		{
+			HookCount[PlayerNumber()]++;
+			GiveInventory("CheckAchievements", 1);
+		}
+	}
+	Delay(1);
+	TakeInventory("Hooked", 1);
+	GiveInventory("MustLetGo", 1);
+	ACS_ExecuteAlways(512, 0);
+}
+
+Script 511 (int grappleTid, int playerTid, int density) CLIENTSIDE
+{
+    int plX; int plY;  int plZ;
+    int grX; int grY;  int grZ;
+    int vX;  int vY;   int vZ;
+    int nX;  int nY;   int nZ;
+    int bX;  int bY;   int bZ;
+    int magnitude;
+    int pointCount;
+    int pointOffset;
+
+    plX = GetActorX(playerTid); grX = GetActorX(grappleTid);
+    plY = GetActorY(playerTid); grY  = GetActorY(grappleTid);
+    plZ = GetActorZ(playerTid); grZ  = GetActorZ(grappleTid);
+    vX   = grX - plX;       vY   = grY - plY;       vZ   = grZ - plZ;
+
+    magnitude = magnitudeThree(vX >> 16, vY >> 16, vZ >> 16);
+
+    pointCount  = magnitude / density;
+    pointOffset = magnitude - (pointCount * density);
+
+    if (magnitude != 0)
+    {
+        nX = vX / magnitude; nY = vY / magnitude; nZ = vZ / magnitude;
+
+        int i; int j;
+        for (i = 0; i < pointCount; i++)
+        {
+            j = (i * density) + pointOffset;
+
+            bX = (nX * j) + plX;
+            bY = (nY * j) + plY;
+            bZ = (nZ * j) + plZ;
+
+            Spawn("HookTrail", bX, bY, bZ);
+        }
+    }
+}
+
+Script 512 (void) // Takes the leftover item away
+{
+	TakeInventory("Iterating", 5000);
+	Delay(15);
+	TakeInventory("MustLetGo", 1);
+}
+
+// They end here
+
+Script 513 (int type)
+{
+	if(type == 0)
+	{
+		if(!CheckInventory("MohophGivenDamage"))
+		{
+			GiveInventory("MohophDamage2", 1);
+			GiveInventory("MohophGivenDamage", 1);
+		}
+	}
+	else
+	if(type == 1)
+	{
+		if(!CheckInventory("MohophGivenSpeed"))
+		{
+			SetActorProperty(0, APROP_SPEED, 1.2);
+			GiveInventory("MohophGivenSpeed", 1);
+		}
+	}
+	else
+	if(type == 2)
+	{
+		if(!CheckInventory("MohophGivenProtect"))
+		{
+			GiveInventory("MohophProtect2", 1);
+			GiveInventory("MohophGivenProtect", 1);
+		}
+	}
+	else
+	if(type == 3)
+		SetActorProperty(0, APROP_ALPHA, 0.4);	
+}
+
+Script 514 (int type) // Save Mohoph bonus
+{
+	if((type >= 0) && (type <= 8))
+		SetActivatorToTarget(0); // Executed from dying Player
+	
+	int pn = PlayerNumber();
+
+	switch (type)
+	{
+		case 0: // Marine
+			MohophPower[pn][0] = "MohophDamage2";
+			break;
+		
+		case 1: // Hunter
+			TakeInventory("MohophGivenSpeed", 1);
+			MohophPower[pn][1] = "MohophSpeed";
+			break;
+		
+		case 2: // Cyborg
+			MohophPower[pn][2] = "MohophFlight";
+			break;
+		
+		case 3: // Ghostbuster
+			MohophPower[pn][3] = "MohophClone";
+			break;
+		
+		case 4: // WitchHunter
+			MohophPower[pn][4] = "MohophRange";
+			break;
+		
+		case 5: // Engineer
+			MohophPower[pn][5] = "MohophProtect2";
+			break;
+		
+		case 6: // Warlock
+			MohophPower[pn][6] = "MohophWarlockCheck";
+			break;
+		
+		case 7: // PlanesWalker
+			MohophPower[pn][7] = "MohophTranslucent";
+			break;
+		
+		case 8: // Protector
+			MohophPower[pn][8] = "MohophDasher";
+			break;
+		
+		default:
+			break;
+	}
+	
+	int i = 0;
+	while(i <= 8)
+	{
+		if(MohophPower[pn][i] != 0)
+		{
+//				print(s:mohophpower[pn][i]);
+			TakeInventory(MohophPower[pn][i], 1);
+			GiveInventory(MohophPower[pn][i], 1);
+		}
+		i++;
+	}
+}
+
+Script 515 (int type)
+{
+	SetFont("BigFont");
+	HudMessage (s: "New power: ", s: MohophType[type]; HUDMSG_FADEINOUT, NS_GBUpgradeMsg, CR_WHITE, 0.5, 0.7, 4.0, 0.3, 0.3);
+}
+
+// Marine grenade explosion
+script 617 (void)
+{
+	Radius_Quake(1, 15, 0, 8, 0);
+}
+
+script 699 (void)
+{
+	SetResultValue(0);
+		if (CheckInventory("CyborgCharge") < 15)
+			SetResultValue(1);
+}
+
+// Prints messages at the top so the classes (ghouls in particular) know their stuff)
+Script 700 (int msgNum) 
+{
+	if (CheckInventory("NoTips"))
+		Terminate;
+    SetHudSize(640, 480, true);
+    SetFont("SMALLFONT");
+    HudMessage(s: NS_StringData[msgNum]; HUDMSG_FADEOUT, NS_HudMessageID, CR_WHITE, 320.0, 20.0, 5.0, 0.5);
+}
+
+Script 701 (int ecase, int tid)
+{
+	if(ecase == 0)
+	{
+		if(GetActorProperty(tid-101, APROP_HEALTH) < 1)
+			Thing_Damage(0, 999, "");
+	}
+	else
+	{
+		if(GetActorProperty(tid-201, APROP_HEALTH) < 1)
+			Thing_Damage(0, 999, "");
+	}
+}
+
+Script 702 (int gone) DISCONNECT
+{
+	if (!PlayerIsSpectator(gone) && !PlayerInGame(gone)) 
+	{
+		gvh_listtoggle[gone]=0;
+		resetPlayerData(gone);
+	}
+	else 
+	{
+		delay(1);
+		restart; 
+	}
+}
+
+// Cyborg smoke spawner
+script 703 ENTER
+{
+	delay(random(1, 4));
+	if(checkinventory("CLASSID") == 3)
+		if(getactorproperty(0, aprop_health) <= 15 && getactorproperty(0, aprop_health) > 0)
+			giveinventory("CYBORGULTEFFECT", 2);
+	delay(1);
+	takeinventory("CYBORGULTEFFECT", 2);
+	restart;
+}
+
+// Sets up beginning stuff
+Script 704 ENTER
+{
+	if (TerminateScript[704])
+		Terminate;
+	Thing_ChangeTid(0, PlayerNumber() + TID_Start);
+	GiveInventory("PlayerNum", PlayerNumber() + 1);
+	SetActorProperty(0, APROP_SPEED, 1.0);
+	IcefiendCloaking[PlayerNumber()] = 0; // Make sure its disabled
+	HudMessage(s:" "; HUDMSG_PLAIN, NS_CyborgGridID, 0, -108.1, 0.1, 1.0); // Clear grid
+	HudMessage(s:" "; HUDMSG_PLAIN, NS_HudMessagePoisonID, 0, -108.1, 0.1, 1.0); // Clear poison hud
+	CancelFade();
+	StartTime[PlayerNumber()]=Timer();
+	HunterFireCounter[PlayerNumber() + TID_Start] = 0;
+	HunterIceCounter[PlayerNumber() + TID_Start] = 0;
+	HunterLightningCounter[PlayerNumber() + TID_Start] = 0;
+	HunterArrowCounter[PlayerNumber() + TID_Start] = 0;
+	WarlockSouls[PlayerNumber()][1][0][0] =	0;
+	WarlockSouls[PlayerNumber()][0][1][0] =	0;
+	WarlockSouls[PlayerNumber()][0][0][1] =	0;
+	
+	for(int i; i <= 8; i ++)
+		MohophPower[PlayerNumber()][i] = 0;
+	
+	delay(1);
+	if(checkactorinventory(activatortid(),  "HumanTeam") == 1)
+	{
+		PlayerTeamArray[activatortid()-1000] = 1;
+	}
+	else if(checkactorinventory(activatortid(),  "GhoulTeam") == 1)
+	{
+		PlayerTeamArray[activatortid()-1000] = 2;
+	}
+	setactivator(activatortid());
+}
+
+Script 705 OPEN // Tracks Cyborgs with visor
+{
+	for (int i = 0; i < MaxPlayers; i++) {
+		if(!isPlayerClass(i + TID_Start, CLASSID_CYBORG) | GetActorProperty(i + TID_Start, APROP_Health) <= 0)
+			Continue; // keep searching
+		if (CheckActorInventory(i + TID_Start, "CyborgVisorOn") > 0 && CheckActorInventory(i + TID_START, "CyborgVisorCell") > 0) {
+			TakeActorInventory(i + TID_Start, "CyborgVisorCell", 1);
+			if (CheckActorInventory(i + TID_Start, "CyborgVisorCell") <= 0 || CheckActorInventory(i + TID_Start, "CyborgVisorOn") == 0 )
+			{
+				TakeInventory("CyborgVisor", 1); 
+				TakeInventory("CyborgVisorOn", 1); 
+				TakeInventory("PowerLightAmp", 1);
+				HudMessage(s:" "; HUDMSG_PLAIN, NS_CyborgGridID, 0, -108.1, 0.1, 0.1); // Remove cyborg hud if there's any
+				LocalAmbientSound("weapons/cyborgcharge", 127);
+			}
+		}
+	}
+	Delay(35);
+	Restart;
+}
+
+// Barbarian fade in/out + Engineer thing
+Script 706 (int type)
+{
+	if (TerminateScript[706])
+		Terminate;
+	if ( type == 0)
+	{
+		FadeTo (0, 255, 0, 0.45, 0.3);
+		Delay (3);
+		FadeTo (0, 255, 0, 0.0, 0.3);
+	}
+	else
+	if (type == 1)
+	{
+		FadeTo (128, 0, 128, 0.45, 0.35);
+		Delay (3);
+		FadeTo (128, 0, 128, 0.0, 0.35);
+	}
+	else
+	if (type == 2)
+	{
+		FadeTo(192, 32, 48, 0.45, 0.75);
+		Delay (3);
+		FadeTo(192, 32, 48, 0.0, 0.75);
+	}
+	else
+	if (type == 3)
+	{
+		if(CheckInventory("Invisiblecounter") == NIGHTMARE_CLOAK_MAX)
+			Terminate;
+		FadeTo(128, 128, 128, 0.55, 0.75);
+		GiveInventory("InvisibleCounter", 2);
+		LocalAmbientSound("weapons/creepercharge",127);
+		Delay (3);
+		FadeTo(128, 128, 128, 0.0, 0.75);	
+	}
+}
+
+// Cyborg HUD emulator
+Script 708 (void) NET
+{
+	if (TerminateScript[708])
+		Terminate;
+	if (!GetActorProperty(ActivatorTID(), APROP_HEALTH) <= 0 && CheckInventory("CyborgVisorCell") > 0) {
+		if (CheckInventory("ClassID") == CLASSID_CYBORG)
+			if (CheckActorInventory(ActivatorTID(), "CyborgVisorOn") < 1) {
+				SetHudSize(640, 480, 1);
+				SetFont("CYBGRID");
+				HudMessage(s:"a"; HUDMSG_PLAIN, NS_CyborgGridID, 0, -108.1, 0.1, NS_CyborgScreenTime);
+				SetFont("BIGFONT");
+				GiveInventory("CyborgVisor", 1); // Powerup
+				GiveInventory("CyborgVisorOn", 1); // Invi item
+				LocalAmbientSound("weapons/cyborgcharge", 127);
+//				ACS_ExecuteAlways(751, 0, 1);
+			} else {
+				TakeInventory("CyborgVisor", 1); 
+				TakeInventory("CyborgVisorOn", 1); 
+				TakeInventory("PowerLightAmp", 1);
+				HudMessage(s:" "; HUDMSG_PLAIN, NS_CyborgGridID, 0, -108.1, 0.1, 0.1); // Remove cyborg hud if there's any
+				LocalAmbientSound("weapons/cyborgcharge", 127);
+			}
+	} else 
+		ACS_ExecuteAlways(751, 0);
+}
+
+// Tips when you die
+Script 709 DEATH
+{
+	if (TerminateScript[709])
+		Terminate;
+		
+	if(checkinventory("classid") == CLASSID_SJAS) // For Sjas teleport
+	{
+		thing_remove(sjasteleportimg + activatortid());
+	}		
+		
+	Thing_ChangeTid(PlayerNumber() + TID_Start, 0);
+	IcefiendCloaking[PlayerNumber()] = 0;
+	StartTime[PlayerNumber()] = 0;
+	HookCount[PlayerNumber()] = 0;
+	
+	WarlockSouls[PlayerNumber()][1][0][0] =	0;
+	WarlockSouls[PlayerNumber()][0][1][0] =	0;
+	WarlockSouls[PlayerNumber()][0][0][1] =	0;	
+	
+	SetHudSize(640, 480, 0);
+	SetFont("SMALLFONT");
+	HudMessage(s:"\ckPro-tip:\n\cj", s:NS_DeathHints[randInt(0, NS_DeathHintsTotal - 1)]; HUDMSG_FADEINOUT|HUDMSG_LOG, NS_DeathMsgID, CR_WHITE, 5.1, 440.1, 5.0, 1.5, 1.0);
+	HudMessage(s:" "; HUDMSG_PLAIN, NS_CyborgGridID, 0, -108.1, 0.1, 0.1); // Remove cyborg hud if there's any
+	FadeTo(255, 255, 255, 0.0, 0.001);
+	
+	for(int i; i <= 8; i ++)
+		MohophPower[PlayerNumber()][i] = 0;	
+	PlayerTeamArray[activatortid()-1000] = 0;
+}
+
+// Ghostbuster setup script
+Script 710 (int upgradeNum)
+{
+	if (TerminateScript[710])
+		Terminate;
+	for (int i = 1; i <= GB_UPGRADETOTAL; i++)
+		if (i != upgradeNum)
+			TakeInventory(GB_UpgradeToken[i], 1);
+	SetFont("BigFont");
+	HudMessage (s: "Weapon upgrade obtained: ", s: GB_WeaponNameColor[upgradeNum], s: "\n\n      \cj(Press \ckalternate fire \cjto activate)"; HUDMSG_FADEINOUT, NS_GBUpgradeMsg, CR_WHITE, 0.5, 0.7, 4.0, 0.3, 0.3);
+}
+
+// Give ghostbuster weapon
+Script 711 (void)
+{
+	if (TerminateScript[711])
+		Terminate;
+	for (int k = 1; k <= GB_UPGRADETOTAL; k++)
+		TakeInventory(GB_WeaponUpgrade[k], 1);
+	for (int i = 1; i <= GB_UPGRADETOTAL; i++)
+		if (CheckInventory(GB_UpgradeToken[i]) > 0) {
+			for (int j = 1; j <= GB_UPGRADETOTAL; j++)
+				TakeInventory (GB_UpgradeToken[j], 1);
+			FadeTo(50, 50, 50, 0.6, 0.1);
+			ActivatorSound("weapons/trapcharge", 127);
+			GiveInventory(GB_WeaponUpgrade[i], 1);
+			GiveInventory("GhostbusterPowerCount", 1);
+			GiveInventory("CheckAchievements", 1);
+			TakeInventory("GhostBusterPlasma", 1);
+			GiveInventory("ProtonCharge", 150);
+			TakeInventory("TransformAmmo", 999);
+			Delay(10);
+			FadeTo(50, 50, 50, 0.0, 0.3);
+			Terminate;
+		}
+}
+
+// Downgrade ghostbuster
+Script 712 (void)
+{
+	if (TerminateScript[712])
+		Terminate;
+	SetFont("BigFont");
+	HudMessage (s: "Weapon downgrading..."; HUDMSG_FADEINOUT, NS_GBUpgradeMsg, CR_WHITE, 0.5, 0.7, 1.0, 0.2, 0.2);
+	for (int i = 1; i <= GB_UPGRADETOTAL; i++) {
+		TakeInventory (GB_UpgradeToken[i], 1);
+		TakeInventory (GB_WeaponUpgrade[i], 1);
+	}
+	GiveInventory("GhostBusterPlasma", 1);
+	GiveInventory("ProtonCharge", 150);
+	TakeInventory("TransformAmmo", 999);
+	SetWeapon("GhostBusterPlasma");
+	Delay(5);
+	GiveInventory("UpgradeSound", 1);
+}
+
+// Display achievement for everyone
+Script 713 (int achieveNum)
+{
+	if (TerminateScript[713])
+		Terminate;
+	int tid = PlayerNumber();
+	if (!checkAchievementUnlocked(achieveNum, tid)) {
+		// Update achievement so it doesnt occur twice
+		updateAchievement(achieveNum, tid);
+		// For unlocker
+		SetHudSize(320, 200, 0);
+		SetFont("BigFont");
+		HudMessage(s: "Achievement unlocked!"; HUDMSG_FADEINOUT, NS_AchieveMsgTop, CR_RED, 160.0, 10.1, 5.0, 0.25, 1.5); 
+		// For everyone else:
+		SetHudSize(800, 600, 0);
+		AmbientSound("achievement\unlock", 90);
+//		ACS_ExecuteAlways(452, 0, achieveNum);
+//		SetFont("BigFont");
+
+			SetFont(NS_Achievement[achieveNum][NS_ACHIEVE_IMAGE]);
+			HudMessageBold(s: "A"; HUDMSG_FADEINOUT, NS_AchieveMsgBottomImage, CR_YELLOW, 5.1, 385.1, NS_AchievementHoldTime, 0.25, 1.5); 
+			SetFont("BigFont");
+			HudMessageBold(s: NS_Achievement[achieveNum][NS_ACHIEVE_NAME]; HUDMSG_FADEINOUT|HUDMSG_LOG, NS_AchieveMsgBottomTitle, CR_WHITE, 5.1, 370.1, NS_AchievementHoldTime, 0.25, 1.5); 
+			
+			SetFont("BigFont");
+			HudMessageBold(s: "Unlocker: ", n: ActivatorTID(); HUDMSG_FADEINOUT, NS_AchieveMsgBottomName, CR_WHITE, 5.1, 515.1, NS_AchievementHoldTime, 0.25, 1.5); 
+			SetFont("BigFont");
+			HudMessageBold(s: NS_Achievement[achieveNum][NS_ACHIEVE_TEXT]; HUDMSG_FADEINOUT, NS_AchieveMsgBottomText, CR_GOLD, 5.1, 530.1, NS_AchievementHoldTime, 0.25, 1.5); 
+			SetFont("BigFont");
+			HudMessageBold(s: "Difficulty: ", s: NS_Achievement[achieveNum][NS_ACHIEVE_DIFFICULTY]; HUDMSG_FADEINOUT, NS_AchieveMsgBottomRank, CR_WHITE, 5.1, 545.1, NS_AchievementHoldTime, 0.25, 1.5);		
+	}
+}
+
+// Achievement detector
+Script 714 (void) 
+{
+	if (TerminateScript[714])
+		Terminate;			
+	int tid = ActivatorTID();
+	
+	switch (CheckActorInventory(tid, "ClassID")) {
+		case CLASSID_NONE:
+			Terminate;
+		case CLASSID_MARINE:
+			if (CheckInventory("MarineSuicideGrenadeKill") > 0)
+				ACS_ExecuteAlways(713, 0, 4);
+			if (CheckInventory("MarineGrenadeKill") >= 3)
+				ACS_ExecuteAlways(713, 0, 5);
+			if (CheckInventory("MarinePistolKill") >= 3)
+				ACS_ExecuteAlways(713, 0, 6);
+			if (CheckInventory("MarineGrenadeMulti") > 1)
+				ACS_ExecuteAlways(713, 0, 29);
+			if (CheckInventory("MarineShotgunKill") >= 4)
+				ACS_ExecuteAlways(713, 0, 38);
+			if (CheckInventory("MarineMachineGunKill") >= 3)
+				ACS_ExecuteAlways(713, 0, 51);
+			if (CheckInventory("UsedAmmo") == 0 && CheckInventory("TotalKillCount") >= 2)
+					ACS_ExecuteAlways(713, 0, 107);			
+			Delay(5);
+			TakeInventory("MarineGrenadeMulti", NS_AchievementMultiMax);
+			break;
+		case CLASSID_HUNTER:	
+			if (CheckInventory("TotalKillCount") >= 7)
+				ACS_ExecuteAlways(713, 0, 123);		
+			if (CheckInventory("HunterLightningRailKill") >= 3)
+				ACS_ExecuteAlways(713, 0, 1);
+			if (CheckInventory("HunterLightningMulti") > 1)
+				ACS_ExecuteAlways(713, 0, 2);
+			if (CheckInventory("HunterSuperFireArrowKill") >= 3)
+				ACS_ExecuteAlways(713, 0, 13);
+			if (CheckInventory("HunterSuperIceArrowKill") >= 3)
+				ACS_ExecuteAlways(713, 0, 14);
+			if (CheckInventory("HunterFireArrowKill") >= 3)
+				ACS_ExecuteAlways(713, 0, 35);
+			if (CheckInventory("HunterIceArrowKill") >= 3)
+				ACS_ExecuteAlways(713, 0, 39);
+			if (CheckInventory("HunterRegularArrowKill") >= 3)
+				ACS_ExecuteAlways(713, 0, 55);
+			if (CheckInventory("HunterLightningMagicKill") >= 2)
+				ACS_ExecuteAlways(713, 0, 56);
+			if (CheckInventory("HunterSuperFireArrowKill") >= 5)
+				ACS_ExecuteAlways(713, 0, 64);
+			if (CheckInventory("HunterSuperLightningRailKill") >= 3)
+				ACS_ExecuteAlways(713, 0, 65);
+			if (CheckInventory("HunterSuperRegularArrowKill") >= 3)
+				ACS_ExecuteAlways(713, 0, 66);
+			if (CheckInventory("HunterSuperRegularArrowKill") >= 1 & CheckInventory("HunterSuperFireArrowKill") >= 1 & CheckInventory("HunterSuperIceArrowKill") >= 1 & CheckInventory("HunterSuperLightningRailKill") >= 1)
+				ACS_ExecuteAlways(713, 0, 91);
+			if (CheckInventory("HunterIceSpikeKill") + CheckInventory("HunterRegularMagicKill") + CheckInventory("HunterFireMagicKill") + CheckInventory("HunterLightningMagicKill") >= 3)
+				ACS_ExecuteAlways(713, 0, 97);
+			if (CheckInventory("HunterFireMulti") > 1)
+				ACS_ExecuteAlways(713, 0, 67);
+				
+				if (CheckInventory("HunterSuperFireArrowKill") >= 1)
+					HunterFireCounter[tid]++;
+				if (CheckInventory("HunterSuperLightningRailKill") >= 1)
+					HunterLightningCounter[tid]++;
+				if (CheckInventory("HunterSuperIceArrowKill") >= 1)
+					HunterIceCounter[tid]++;
+				if (CheckInventory("HunterSuperRegularArrowKill") >= 1)
+					HunterArrowCounter[tid]++;
+				if (HunterArrowCounter[tid] >= 3 && HunterIceCounter[tid] >= 3 && HunterLightningCounter[tid] >= 3 && HunterFireCounter[tid] >= 3)
+				{	
+					HunterArrowCounter[tid] = -999;
+					HunterIceCounter[tid] = -999;
+					HunterLightningCounter[tid] = -999;
+				    HunterFireCounter[tid] = -999;
+					ACS_ExecuteAlways(713, 0, 91);
+				}
+			Delay(3);
+			TakeInventory("HunterLightningMulti", NS_AchievementMultiMax);
+			TakeInventory("HunterFireMulti", NS_AchievementMultiMax); 
+			break;
+		case CLASSID_CYBORG:
+			if (CheckInventory("CyborgCreeperLowHPKill") > 0)
+			{
+				if (GetActorProperty(tid, APROP_HEALTH) > 0 & GetActorProperty(tid, APROP_HEALTH) <= 5)
+					ACS_ExecuteAlways(713, 0, 0);
+				else
+					TakeInventory("CyborgCreeperLowHPKill", 1);
+			}
+			if (CheckInventory("TotalKillCount") >= 5)
+				ACS_ExecuteAlways(713, 0, 68);
+			if (CheckInventory("JetpackKill") >= 2)
+				ACS_ExecuteAlways(713, 0, 117);
+			if (CheckInventory("TotalKillCount") >= 3 & CheckInventory("CyborgFuel") >= 150)
+				ACS_ExecuteAlways(713, 0, 33);
+			if (CheckInventory("CyborgPulseKill") >= 3)
+				ACS_ExecuteAlways(713, 0, 99);			
+			if (CheckInventory("CyborgCrapPlasmaKill") >= 1)
+				ACS_ExecuteAlways(713, 0, 40);
+			if (CheckInventory("CyborgPlasmaKill") >= 7)
+				ACS_ExecuteAlways(713, 0, 43);		
+			if (CheckInventory("CyborgChargeCount") >= 500)
+				ACS_ExecuteAlways(713, 0, 114);
+			break;
+		case CLASSID_GHOSTBUSTER:
+			if (CheckInventory("TotalKillCount") >= 7)
+				ACS_ExecuteAlways(713, 0, 124);		
+			if (CheckInventory("GhostbusterHorrorKill") >= 3)
+				ACS_ExecuteAlways(713, 0, 15);
+			if (CheckInventory("GhostbusterTrapKill") >= 3)
+				ACS_ExecuteAlways(713, 0, 50);
+			if (CheckInventory("GhostbusterUpgraded") < 1 & CheckInventory("TotalKillCount") >= 3)
+				ACS_ExecuteAlways(713, 0, 52);
+			if (CheckInventory("GhostbusterEchoKill") >= 3)
+				ACS_ExecuteAlways(713, 0, 77);
+			if (CheckInventory("GhostbusterBoneKill") >= 3)
+				ACS_ExecuteAlways(713, 0, 78);
+			if (CheckInventory("GhostbusterSoulKill") >= 3)
+				ACS_ExecuteAlways(713, 0, 79);
+			if (CheckInventory("GhostbusterBloodKill") >= 3)
+				ACS_ExecuteAlways(713, 0, 80);
+			if (CheckInventory("GhostbusterIceFallKill") >= 3)
+				ACS_ExecuteAlways(713, 0, 81);
+			if (CheckInventory("GhostbusterDefilerBallKill") >= 3)
+				ACS_ExecuteAlways(713, 0, 82);	
+			if (CheckInventory("GhostBusterPowerCount") >= 4)
+				ACS_ExecuteAlways(713, 0, 113);
+			break;
+		case CLASSID_ENGINEER:
+			if (CheckInventory("EngineerNailKill") >= 1 && CheckInventory("EngineerSawKill") >= 1 && CheckInventory("EngineerPulvKill") >= 1 && CheckInventory("SentryBulletKills") >= 1 && CheckInventory("EngyDroneKill") >= 1)
+				ACS_ExecuteAlways(713, 0, 89);		
+			if (CheckInventory("EngineerNailKill") >= 3)
+				ACS_ExecuteAlways(713, 0, 12);
+			if (CheckInventory("EngineerSawKill") >= 3)
+				ACS_ExecuteAlways(713, 0, 19);
+			if (CheckInventory("TotalKillCount") >= 5)
+				ACS_ExecuteAlways(713, 0, 41);
+			if (CheckInventory("EngineerPulvKill") >= 3)
+				ACS_ExecuteAlways(713, 0, 83);
+			if (CheckInventory("SentryBulletKillsLvl3") >= 1)
+				ACS_ExecuteAlways(713, 0, 122);								
+			if (CheckInventory("SentryBulletKills") >= 2)
+				ACS_ExecuteAlways(713, 0, 87);	
+			if (CheckInventory("EngyDroneKill") >= 2)
+				ACS_ExecuteAlways(713, 0, 57);
+			break;
+		case CLASSID_WITCH:
+			if (HookCount[PlayerNumber()] >= 30)
+				ACS_ExecuteAlways(713, 0, 32);
+			if (CheckInventory("FlaskKill") >= 3)
+				ACS_ExecuteAlways(713, 0, 72);
+			if (CheckInventory("PelletKill") >= 3)
+				ACS_ExecuteAlways(713, 0, 84);
+			if (CheckInventory("DartKill") >= 3)
+				ACS_ExecuteAlways(713, 0, 85);
+			if (CheckInventory("PelletKill") + CheckInventory("DartKill") >= 6 && !CheckInventory("WHCondition"))
+				ACS_ExecuteAlways(713, 0, 88);
+			break;
+		case CLASSID_PLANEWALKER:
+			if (CheckInventory("PlaneShotKills") >= 5)
+				ACS_ExecuteAlways(713, 0, 59);
+			if (CheckInventory("PlaneDashKill") >= 1)
+				ACS_ExecuteAlways(713, 0, 60);				
+			if (CheckInventory("PlaneVortexKills") >= 3)
+				ACS_ExecuteAlways(713, 0, 61);	
+			if (CheckInventory("PlaneBladeKill") >= 2)
+				ACS_ExecuteAlways(713, 0, 101);					
+			if (CheckInventory("EnergyUsage") >= 600)
+				ACS_ExecuteAlways(713, 0, 100);
+			break;
+		case CLASSID_WARLOCK:
+			if (CheckInventory("TotalKillCount") >= 7)
+				ACS_ExecuteAlways(713, 0, 120);		
+			if (CheckInventory("WarlockIceKillFrostbite") >= 2)
+				ACS_ExecuteAlways(713, 0, 28);
+			if (CheckInventory("WarlockFireballKill") + CheckInventory("WarlockBigFireballKill") >= 3)
+				ACS_ExecuteAlways(713, 0, 45);
+			if (CheckInventory("WarlockIceShardsKill") >= 5)
+				ACS_ExecuteAlways(713, 0, 69);
+			if (CheckInventory("WarlockIceShardsKill") >= 3)
+				ACS_ExecuteAlways(713, 0, 70);
+			if (CheckInventory("WarlockLightningKill") >= 3)
+				ACS_ExecuteAlways(713, 0, 71);
+			if ((CheckInventory("WarlockBigFireballKill") >= 1 | CheckInventory("WarlockFireballKill") >= 1) & CheckInventory("WarlockIceShardsKill") >= 1 & CheckInventory("WarlockLightningKill") >= 1)
+				ACS_ExecuteAlways(713, 0, 73);
+			if (CheckInventory("WarlockNovaKill") >= 2)
+				ACS_ExecuteAlways(713, 0, 85);
+			if (CheckInventory("PurpleMagicKill") >= 3)
+				ACS_ExecuteAlways(713, 0, 112);	
+			if (CheckInventory("UsedAmmo") == 0 && CheckInventory("TotalKillCount") >= 2)
+					ACS_ExecuteAlways(713, 0, 107);
+			break;
+		case CLASSID_PROTECTOR:
+			if (CheckInventory("ProtMissileKill") >= 3)
+				ACS_ExecuteAlways(713, 0, 116);
+			if (CheckInventory("ProtPlasmaKill") >= 3)
+				ACS_ExecuteAlways(713, 0, 125);
+			if (CheckInventory("ProtLightningKill") >= 3)
+				ACS_ExecuteAlways(713, 0, 126);
+			if (CheckInventory("ProtDashCount") >= 50)
+				ACS_ExecuteAlways(713, 0, 127);
+			if (CheckInventory("ProtLightningMulti") >= 2)
+				ACS_executeAlways(713, 0, 128);
+			Delay(20);
+			TakeInventory("ProtLightningMulti", NS_AchievementMultiMax);
+			break;
+		case CLASSID_SJAS:
+			if (CheckInventory("TotalKillCount") >= 5)
+				ACS_ExecuteAlways(713, 0, 27);
+			if (CheckInventory("TotalKillCount") >= 3 && !CheckInventory("SjasUsedReflect"))
+				ACS_ExecuteAlways(713, 0, 106);				
+			if (CheckInventory("SjasMeleeMulti") > 1)
+				ACS_ExecuteAlways(713, 0, 34);	
+			if (CheckInventory("IjustTeleported"))
+				ACS_ExecuteAlways(713, 0, 22);
+				
+			if (GetActorProperty(0, APROP_HEALTH) < 50)
+				TakeInventory("LordSjasCounter", 1);				
+			if (CheckInventory("LordSjasCounter") >= 3)
+				ACS_ExecuteAlways(713, 0, 118);
+			
+			Delay(10);
+			TakeInventory("SjasMeleeMulti", NS_AchievementMultiMax);
+			break;
+		case CLASSID_JITTERSKULL:
+			if (CheckInventory("TotalKillCount") >= 5)
+				ACS_ExecuteAlways(713, 0, 18);
+			if (CheckInventory("JitterMeleeMulti") > 1)
+				ACS_ExecuteAlways(713, 0, 30);	
+			if (CheckInventory("JitterWalkCount") >= 30)
+				ACS_ExecuteAlways(713, 0, 108);
+			if (CheckInventory("JitterNomCount") >= 40)
+				ACS_ExecuteAlways(713, 0, 54);
+			Delay(25);
+			TakeInventory("JitterMeleeMulti", NS_AchievementMultiMax);
+			break;
+		case CLASSID_CREEPER:
+			if (CheckInventory("CreeperMeleeKill") >= 3 & CheckInventory("CreeperUsedBall") == 0)
+				ACS_ExecuteAlways(713, 0, 102);
+			if (CheckInventory("TotalKillCount") >= 5)
+				ACS_ExecuteAlways(713, 0, 42);
+			if (CheckInventory("CreepStunKill") >= 1)
+				ACS_ExecuteAlways(713, 0, 48);
+			if (CheckInventory("CreepHealKill") >= 2)
+				ACS_ExecuteAlways(713, 0, 110);
+			break;
+		case CLASSID_CHOKE:
+			if (CheckInventory("ChokeFeastKill") >= 1)
+				ACS_ExecuteAlways(713, 0, 96);		
+			if (CheckInventory("ChokeBloodBallMulti") > 1)
+				ACS_ExecuteAlways(713, 0, 94);		
+			if (CheckInventory("TotalKillCount") >= 5)
+				ACS_ExecuteAlways(713, 0, 25);
+			if (CheckInventory("ChokeBloodBallKill") >= 2)
+				ACS_ExecuteAlways(713, 0, 47);
+			if (CheckInventory("ChokeBloodBallKill") >= 3)
+				ACS_ExecuteAlways(713, 0, 49);
+			if (CheckInventory("ChokeBloodBallKill") >= 4)
+				ACS_ExecuteAlways(713, 0, 53);
+			if (CheckInventory("ChokeVomitKill") >= 3)
+				ACS_ExecuteAlways(713, 0, 93);			
+			Delay(12);
+			TakeInventory("ChokeBloodBallMulti", NS_AchievementMultiMax);
+			break;
+		case CLASSID_FROSTBITE:
+			if (CheckInventory("TotalKillCount") >= 5)
+				ACS_ExecuteAlways(713, 0, 26);
+			if (CheckInventory("FrostbiteMeleeKill") >= 3)
+				ACS_ExecuteAlways(713, 0, 23);
+			if (CheckInventory("FrostyRainKill") >= 2)
+				ACS_ExecuteAlways(713, 0, 98);
+			if (CheckInventory("FrostyBreathMulti") >= 3)
+				ACS_ExecuteAlways(713, 0, 109);		
+			if (CheckInventory("FrostyRegen") >= 100)
+				ACS_ExecuteAlways(713, 0, 111);
+			Delay(35*5);
+			TakeInventory("FrostyBreathMulti", NS_AchievementMultiMax);
+			break;			
+		case CLASSID_DEFILER:
+			if (CheckInventory("ImpaleKill") >= 5)
+				ACS_ExecuteAlways(713, 0, 105);	
+			if (CheckInventory("DoubleImpaleKill") >= 3)
+				ACS_ExecuteAlways(713, 0, 10);				
+			if (CheckInventory("DoubleImpaleKill") >= 2)
+				ACS_ExecuteAlways(713, 0, 9);
+			if (CheckInventory("ImpalerLanded"))
+				ACS_ExecuteAlways(713, 0, 103);
+			if (CheckInventory("JumpingJehosaphat") >= 20)
+				ACS_ExecuteAlways(713, 0, 3);
+			Delay(35);
+			TakeInventory("DoubleImpaleKill", 9001);
+			break;
+		case CLASSID_NIGHTMARE:	
+			if (CheckInventory("DimmedMeleeKill") >= 3)
+				ACS_ExecuteAlways(713, 0, 11);
+			if (CheckInventory("TotalKillCount") >= 5)
+				ACS_ExecuteAlways(713, 0, 16);
+			if (CheckInventory("NightmareMeleeKill") >= 3)
+				ACS_ExecuteAlways(713, 0, 17);				
+			if (CheckInventory("CleaveKill") >= 2)
+				ACS_ExecuteAlways(713, 0, 58);
+			if (CheckInventory("TotalKillCount") >= 3 && !CheckInventory("UsedStealth"))
+				ACS_ExecuteAlways(713, 0, 37);
+			Delay(20);
+			TakeInventory("CleaveKill", NS_AchievementMultiMax);
+			break;
+		case CLASSID_MOHOPH:
+			if (CheckInventory("KilledMarine2") >= 1 && CheckInventory("KilledHunter2") >= 1 && CheckInventory("KilledCyborg2") >= 1 && CheckInventory("KilledGhostbuster2") >= 1 && CheckInventory("KilledEngineer2") >= 1 && CheckInventory("KilledWitchHunter2") >= 1 && CheckInventory("KilledWarlock2") >= 1 && CheckInventory("KilledPlaneWalker2") >= 1 && CheckInventory("KilledProtector2") >= 1)	
+				ACS_ExecuteAlways(713, 0, 115);
+			if (CheckInventory("KilledMarine2") >= 3 || CheckInventory("KilledHunter2") >= 3 || CheckInventory("KilledCyborg2") >= 3 || CheckInventory("KilledGhostbuster2") >= 3 || CheckInventory("KilledEngineer2") >= 3 || CheckInventory("KilledWitchHunter2") >= 3 || CheckInventory("KilledWarlock2") >= 3 || CheckInventory("KilledPlaneWalker2") >= 3)
+				ACS_ExecuteAlways(713, 0, 90);
+			if (CheckInventory("MorphCount2") >= 3)
+				ACS_ExecuteAlways(713, 0, 92);
+			if (CheckInventory("MohophKill") >= 5)
+				ACS_ExecuteAlways(713, 0, 95);
+			if (CheckInventory("JustMorphedKill") >= 2)
+				ACS_ExecuteAlways(713, 0, 98);
+			Delay(35*3);
+			TakeInventory("JustMorphedKill", NS_AchievementMultiMax);
+			break;
+		case CLASSID_MORGWYR:
+			if (CheckInventory("MorgMeleeKill") + CheckInventory("MorgBatKill") >= 3 && !CheckInventory("MorgUsedDisplacement"))
+				ACS_ExecuteAlways(713, 0, 133);
+			if (CheckInventory("TotalKillCount") >= 5)
+				ACS_ExecuteAlways(713, 0, 130);
+			if (CheckInventory("MorgMulti") >= 2)
+				ACS_ExecuteAlways(713, 0, 129);
+			if (CheckInventory("MorgBatKill") >= 3)
+				ACS_ExecuteAlways(713, 0, 132);
+			if (CheckInventory("MorgSwapped"))
+				ACS_ExecuteAlways(713, 0, 131);
+			Delay(20);
+			TakeInventory("MorgMulti", NS_AchievementMultiMax);
+			break;
+	}
+	
+	// Team specifics
+	
+	if (CheckInventory("KilledMarine") > 0 & CheckInventory("KilledHunter") > 0 & CheckInventory("KilledCyborg") > 0 & CheckInventory("KilledGhostbuster") > 0)
+		ACS_ExecuteAlways(713, 0, 31);
+	if (CheckInventory("KilledSjas") > 0 & CheckInventory("KilledJitterskull") > 0 & CheckInventory("KilledCreeper") > 0 & CheckInventory("KilledChoke") > 0)
+		ACS_ExecuteAlways(713, 0, 74);
+	if (CheckInventory("KilledMarine") > 0 & CheckInventory("KilledHunter") > 0 & CheckInventory("KilledCyborg") > 0 & CheckInventory("KilledGhostbuster") > 0 & CheckInventory("KilledWitchHunter") > 0 & CheckInventory("KilledEngineer") > 0 & CheckInventory("KilledPlaneWalker") > 0 & CheckInventory("KilledWarlock") > 0)
+		ACS_ExecuteAlways(713, 0, 76);
+	if (CheckInventory("KilledSjas") > 0 & CheckInventory("KilledJitterskull") > 0 & CheckInventory("KilledCreeper") > 0 & CheckInventory("KilledChoke") > 0 & CheckInventory("KilledFrostbite") > 0 & CheckInventory("KilledDefiler") > 0 & CheckInventory("KilledIcefiend") > 0 & CheckInventory("KilledMohoph") > 0)
+		ACS_ExecuteAlways(713, 0, 75);
+	
+	// Map specific generics
+
+	if (CheckInventory("LowHpKill") >= 3)
+	{
+		if (GetActorProperty(tid, APROP_HEALTH) > 0 & GetActorProperty(tid, APROP_HEALTH) <= 10)
+			ACS_ExecuteAlways(713, 0, 104);
+		else { TakeInventory("LowHpKill", 255); }
+	}
+	else
+	{
+		if (GetActorProperty(tid, APROP_HEALTH) > 10)
+			TakeInventory("LowHpKill", 1); // Take back if you don't meet the criteria
+	}
+
+	if (CheckInventory("TotalKillCount") >= 10)
+		ACS_ExecuteAlways(713, 0, 8);
+		
+	if (PlayerFrags() >= 20)
+		ACS_ExecuteAlways(713, 0, 7);
+	if (PlayerFrags() >= 30)
+		ACS_ExecuteAlways(713, 0, 86);
+	if (PlayerFrags() >= 40)
+		ACS_ExecuteAlways(713, 0, 63);
+	
+	// Class specials
+	
+	if (CheckInventory("StealthKill") >= 2)
+		ACS_ExecuteAlways(713, 0, 119);
+	if (CheckInventory("ImpalerHopKill"))
+		ACS_ExecuteAlways(713, 0, 20);
+	if (CheckInventory("PWInvisKill"))
+		ACS_ExecuteAlways(713, 0, 21);
+	if (CheckInventory("KilledTeleportedSjas"))
+		ACS_ExecuteAlways(713, 0, 36);
+}
+
+// Achievement list shower
+Script 716 (void) NET
+{
+	 if (gvh_listtoggle[PlayerNumber()]==1)
+	 {
+		ACS_ExecuteAlways(733,0);
+		LocalAmbientSound("menu/clear",127);
+		Terminate;
+	 }
+	 if (gvh_listtoggle[PlayerNumber()]==0)
+	 {
+		gvh_listtoggle[PlayerNumber()]=1;
+		
+		// Show your class' page first
+		if(!CheckInventory("OpenedAchieves"))
+		{
+			GiveInventory("OpenedAchieves", 1);
+			alist_page[PlayerNumber()] = CheckInventory("ClassID")-1;
+		}
+		
+		LocalAmbientSound("menu/activate",127);
+	 }
+	 ACS_ExecuteAlways(732,0);
+}
+
+// Hunter upgrade
+Script 718 (void)
+{
+	if (TerminateScript[718])
+		Terminate;
+	if (CheckInventory("ClassID") == CLASSID_HUNTER) {
+		int pn = PlayerNumber();
+		LocalAmbientSound("hunterupgrade", 127);
+		if (CheckWeapon("Bow")) 
+		{
+			if (GetPlayerInfo(PlayerNumber(), PLAYERINFO_GENDER) == 1)
+			{
+				int g = random(0,2);
+				switch (g) {
+				case 0:
+					ActivatorSound("HunterUseSilver1", 127);
+					ActivatorSound("HunterUseSilver1", 127);
+				break;
+				case 1:
+					ActivatorSound("HunterUseSilver2", 127);
+					ActivatorSound("HunterUseSilver2", 127);
+				break;	
+				case 2:
+					ActivatorSound("HunterUseSilver3", 127);
+					ActivatorSound("HunterUseSilver3", 127);
+				break;
+				}
+			}
+						
+			GiveInventory("SuperRegularBow", 1);
+			TakeInventory("Bow", 1);
+			FadeTo(255, 255, 255, 0.8, 0.15);
+			Delay(8);
+			FadeTo(255, 255, 255, 0.0, 0.35);
+		} 
+		else 
+		{
+			if (GetPlayerInfo(PlayerNumber(), PLAYERINFO_GENDER) == 1)
+			{
+					int h = random(0,2);
+					switch (h) {
+					case 0:
+						ActivatorSound("FHunterSpecial1", 127);
+						ActivatorSound("FHunterSpecial1", 127);
+					break;
+					case 1:
+						ActivatorSound("FHunterSpecial2", 127);
+						ActivatorSound("FHunterSpecial2", 127);
+					break;	
+					case 2:
+						ActivatorSound("FHunterSpecial3", 127);
+						ActivatorSound("FHunterSpecial3", 127);
+					break;
+					}
+			}
+				
+			if (CheckWeapon("FireBow")) 
+			{						
+				GiveInventory("SuperFireBow", 1);	
+				TakeInventory("FireBow", 1);
+				FadeTo(255, 0, 0, 0.8, 0.15);
+				Delay(8);
+				FadeTo(255, 0, 0, 0.0, 0.35);
+			} 
+			else 
+			if (CheckWeapon("IceBow")) 
+			{						
+				GiveInventory("SuperIceBow", 1);
+				TakeInventory("IceBow", 1);
+				FadeTo(128, 255, 255, 0.8, 0.15);
+				Delay(8);
+				FadeTo(128, 255, 255, 0.0, 0.35);
+			} 
+			else if (CheckWeapon("LightningBow")) 
+			{				
+				GiveInventory("SuperLightningBow", 1);
+				TakeInventory("LightningBow", 1);
+				FadeTo(255, 255, 0, 0.8, 0.1);
+				Delay(8);
+				FadeTo(255, 255, 0, 0.0, 0.35);
+			} 
+			else 
+			{	
+				GiveInventory("SuperRegularBow", 1);	
+				TakeInventory("Bow", 1);
+				FadeTo(255, 255, 255, 0.8, 0.15);
+				Delay(8);
+				FadeTo(255, 255, 255, 0.0, 0.35);
+			}
+		}
+	}
+}
+
+// Clears achieve and frag list
+Script 719 (int num) DISCONNECT
+{
+	if (TerminateScript[719])
+		Terminate;
+	HudMessage(s:" "; HUDMSG_PLAIN, NS_CyborgGridID, 0, -108.1, 0.1, 1.0); // Clear grid
+	FadeTo(255, 255, 255, 0.0, 0.001);
+	IcefiendCloaking[num] = 0;
+	StartTime[num] = 0;
+	WarlockSouls[num-1000][1][0][0] =	0;
+	WarlockSouls[num-1000][0][1][0] =	0;
+	WarlockSouls[num-1000][0][0][1] =	0;	
+	num = activatortid();
+	PlayerTeamArray[num-1000] = 0;	
+}
+
+// Disables Tip Display
+Script 720 (void)
+{
+	if(CheckInventory("NoTips"))
+	{
+		TakeInventory("Notips", 1);
+		SetFont("BIGFONT");
+		HudMessage(s:"Messages have been activated"; HUDMSG_PLAIN, NS_HudMessageID, CR_RED, 1.5, 0.05, 3.0, 0.5, 1.0);
+	}
+	else
+	{
+		GiveInventory("NoTips", 1);
+		SetFont("BIGFONT");
+		HudMessage(s:"Messages have been disabled"; HUDMSG_PLAIN, NS_HudMessageID, CR_RED, 1.5, 0.05, 3.0, 0.5, 1.0);
+	}
+}
+
+// Cyborg "not enough energy" fail message
+Script 721 (void)
+{
+		if (CheckInventory("CyborgPulseFailCooldown") == 0) 
+		{
+			SetFont("BIGFONT");
+			HudMessage(s:"Not enough energy"; HUDMSG_PLAIN, 55, CR_RED, 1.5, 0.1, 3.0, 0.5, 1.0);
+			GiveInventory("CyborgPulseFailCooldown", 1);
+			LocalAmbientSound("cyborg/NoEnergy", 127);
+			Delay(35*3);
+			TakeInventory("CyborgPulseFailCooldown", 1);
+		}
+}
+
+// Cyborg pulse hud
+Script 722 (void)
+{
+	if (TerminateScript[722])
+		Terminate;
+	FadeTo (192, 32, 192, 0.4, 0.5);
+    Delay (5*3);
+    FadeTo (192, 32, 192, 0.0, 0.5);
+}
+
+// When you respawn
+Script 723 RESPAWN
+{
+	if (TerminateScript[723])
+		Terminate;
+	Thing_ChangeTid(0, PlayerNumber() + TID_Start);
+	GiveInventory("PlayerNum", PlayerNumber() + 1);
+	if (StartTime[PlayerNumber()] == 0) StartTime[PlayerNumber()] = Timer();
+	SetActorProperty(0, APROP_SPEED, 1.0);
+	HudMessage(s:" "; HUDMSG_PLAIN, NS_CyborgGridID, 0, -108.1, 0.1, 1.0); // Clear grid
+	CancelFade();
+	
+	for(int i; i <= 8; i ++)
+		MohophPower[PlayerNumber()][i] = 0;	
+}
+
+// Increase Map kill count
+Script 724 (int tid)
+{
+	if (TerminateScript[724])
+		Terminate;
+	if (tid < TID_Start | tid > TID_Start + 32)
+		Terminate;
+	TotalMapKills[tid - TID_Start]++;
+}
+
+// Choke healer
+Script 726 (int healAmount, int skipHealPause)
+{
+	if (TerminateScript[726])
+		Terminate;
+	if (!isPlayerClass(ActivatorTID(), CLASSID_CHOKE))
+		Terminate;
+	if (skipHealPause == 0) {
+		if (CheckInventory("ChokeHealPause") > 0)
+			Terminate;
+		GiveInventory("ChokeHealPause", 1);
+	}
+	if (GetActorProperty(ActivatorTID(), APROP_HEALTH) > 0)
+		HealThing(healAmount);
+}
+
+script 727 OPEN
+{
+	if(GetCVar("sv_nobalanceteams"))
+	Terminate;
+
+	int TotalHumans = getteamproperty(0, TPROP_NumLivePlayers);
+	int TotalGhouls = getteamproperty(1, TPROP_NumLivePlayers); 
+	int Balance = (TotalHumans - TotalGhouls);
+	if(Balance == -2)
+	{
+		SetFont("SmallFont");
+		SetHudSize(320, 240, 1);
+		HudMessageBold(s: "Balance the Teams!\nHumans do 15% more Damage!"; HUDMSG_FADEOUT, 777, CR_RED, 160.0, 120.0, 3.0);
+		acs_execute(728, 0, 1, 0, 0);
+	}
+	if(Balance == -3)
+	{
+		SetFont("SmallFont");
+		SetHudSize(320, 240, 1);
+		HudMessageBold(s: "Balance the Teams!\nHumans do 20% more Damage!"; HUDMSG_FADEOUT, 777, CR_RED, 160.0, 120.0, 3.0);
+		acs_execute(728, 0, 2, 0, 0);
+	}
+	if(Balance == -4)
+	{
+		SetFont("SmallFont");
+		SetHudSize(320, 240, 1);
+		HudMessageBold(s: "Balance the Teams!\nHumans do 25% more Damage!"; HUDMSG_FADEOUT, 777, CR_RED, 160.0, 120.0, 3.0);
+		acs_execute(728, 0, 3, 0, 0);
+	}
+	if(Balance <= -5)
+	{
+		SetFont("SmallFont");
+		SetHudSize(320, 240, 1);
+		HudMessageBold(s: "Balance the Teams!\nHumans do 30% more Damage!"; HUDMSG_FADEOUT, 777, CR_RED, 160.0, 120.0, 3.0);
+		acs_execute(728, 0, 4, 0, 0);
+	}
+	if(Balance >= 2)
+	{
+		SetFont("SmallFont");
+		SetHudSize(320, 240, 1);
+		HudMessageBold(s:"Balance the Teams!\nGhouls get +", d:Balance*5, s:" health!"; HUDMSG_FADEOUT, 777, CR_RED, 160.0, 120.0, 3.0);
+		acs_execute(728, 0, 5*Balance, 0, 0);
+	}
+}
+script 728 (int Buff)
+{
+	if(Buff == 1)
+	{
+	for(int i = 1000; i < 1064; i++)
+	{
+	acs_executealways(729, 0, i, 1, 0);
+	} 
+	}
+
+	if(Buff == 2)
+	{
+	for(int j = 1000; j < 1064; j++)
+	{
+	acs_executealways(729, 0, j, 2, 0);
+	} 
+	}
+
+	if(Buff == 3)
+	{
+	for(int k = 1000; k < 1064; k++)
+	{
+	acs_executealways(729, 0, k, 3, 0);
+	} 
+	}
+
+	if(Buff == 4)
+	{
+	for(int l = 1000; l < 1064; l++)
+	{
+	acs_executealways(729, 0, l, 4, 0);
+	} 
+	}
+	if(Buff >= 5)
+	{
+	for(int m = 1000; m < 1064; m++)
+	{
+	acs_executealways(729, 0, m, Buff, 0);
+	} 
+	}
+}
+
+script 729 (int who, int type)
+{
+	setactivator(who);
+	if(playerteam() == TEAM_BLUE && type == 1)
+		giveinventory("Power15Damage", 1);
+	if(playerteam() == TEAM_BLUE && type == 2)
+		giveinventory("Power20Damage", 1);
+	if(playerteam() == TEAM_BLUE && type == 3)
+		giveinventory("Power25Damage", 1);
+	if(playerteam() == TEAM_BLUE && type == 4)
+		giveinventory("Power30Damage", 1);
+	if(playerteam() == TEAM_RED && type >= 5)
+		giveinventory("healthbonus", type);
+}
+
+// Achievement shower
+Script 732 (void)
+{
+	 // Print ACHIEVEMENT LIST on top of the screen
+	 SetHudSize(800,600,0);
+	 SetFont( "BIGFONT ");
+	 HudMessage(s: "ACHIEVEMENT LIST ";
+	 HUDMSG_PLAIN, NS_AchieveListStartID, CR_GOLD, 400.4, 2.1, 0.0, 0.0);
+	 // Print the correct category
+	 SetFont( "CONFONT ");
+	 if (alist_page[PlayerNumber()]==0) alist_category= "Marine ";
+	 else if (alist_page[PlayerNumber()]==1) alist_category= "Hunter ";
+	 else if (alist_page[PlayerNumber()]==2) alist_category= "Cyborg ";
+	 else if (alist_page[PlayerNumber()]==3) alist_category= "Ghostbuster ";
+	 else if (alist_page[PlayerNumber()]==4) alist_category= "Engineer ";
+	 else if (alist_page[PlayerNumber()]==5) alist_category= "WitchHunter ";
+	 else if (alist_page[PlayerNumber()]==6) alist_category= "Warlock ";
+	 else if (alist_page[PlayerNumber()]==7) alist_category= "Planeswalker ";
+	 else if (alist_page[PlayerNumber()]==8) alist_category= "Protector ";
+	 else if (alist_page[PlayerNumber()]==9) alist_category= "Sjas ";
+	 else if (alist_page[PlayerNumber()]==10) alist_category= "Jitterskull ";
+	 else if (alist_page[PlayerNumber()]==11) alist_category= "Creeper ";
+	 else if (alist_page[PlayerNumber()]==12) alist_category= "Choke ";
+	 else if (alist_page[PlayerNumber()]==13) alist_category= "Frostbite ";
+	 else if (alist_page[PlayerNumber()]==14) alist_category= "Nightmare ";
+	 else if (alist_page[PlayerNumber()]==15) alist_category= "Impaler ";
+	 else if (alist_page[PlayerNumber()]==16) alist_category= "Mohoph ";
+	 else if (alist_page[PlayerNumber()]==17) alist_category= "Morgwyr ";
+	 else if (alist_page[PlayerNumber()]==18) alist_category= "Global ";
+	 else // Bandaid fixes oh god
+	 {
+		alist_page[PlayerNumber()] = 0;
+		alist_category= "Marine ";
+	 }
+	 
+	HudMessage(s: "< ", s:alist_category, s: " > ";
+	HUDMSG_PLAIN, NS_AchieveListStartID+1, CR_GOLD, 400.4, 20.1, 0.0, 0.0);
+
+	 // Create the list itself
+	 int alist_j=0;
+	 int alist_i;
+	 for (alist_i=0; alist_i<alist_maxitems; alist_i++)
+	 {
+		if (NS_AchievementListCategory[alist_page[PlayerNumber()]][alist_i]!=-1)
+		{
+			 alist_j++;
+			 int alist_ca = NS_AchievementListCategory[alist_page[PlayerNumber()]][alist_i];
+			 SetHudSize(800,600,0);
+			 SetFont( "SMALLFONT ");
+			 HudMessage(s:NS_AchievementListUnlockColor[checkAchievementUnlocked(alist_ca,PlayerNumber())],
+			 s: "",s:NS_Achievement[alist_ca][NS_ACHIEVE_NAME],
+			 s: ":\n ",s:NS_Achievement[alist_ca][NS_ACHIEVE_TEXT],
+			 s: "\n ",s:NS_Achievement[alist_ca][NS_ACHIEVE_DIFFICULTY],s: "\n\n ";
+			 HUDMSG_PLAIN,NS_AchieveListStartID+(alist_j*2), CR_WHITE, 184.1, 60.1+((alist_j-1)*32.0), 0.0, 0.0);
+			 SetHudSize(3060,2548,0);
+			 if (checkAchievementUnlocked(alist_ca,PlayerNumber())==0)
+			 SetFont("ACH_LOCK");
+			 else
+			 SetFont(NS_Achievement[alist_ca][NS_ACHIEVE_IMAGE]);
+			 HudMessage(s: "A";HUDMSG_PLAIN,NS_AchieveListStartID+1+(alist_j*2), CR_GOLD, 575.1, 120.1+(alist_j*135.0), 0.0, 0.0);
+		 }
+	 }
+	 // Remove rest of garbage (in case of switching a category)
+	 while (alist_j<alist_maxitems)
+	 {
+		alist_j++;
+		HudMessage(s: "";HUDMSG_PLAIN, NS_AchieveListStartID+(alist_j*2), CR_GOLD, 575.1, 100.1, 0.01, 0.01);
+		HudMessage(s: "";HUDMSG_PLAIN, NS_AchieveListStartID+1+(alist_j*2), CR_GOLD, 575.1, 100.1, 0.01, 0.01);
+	 }
+}
+
+// Remove the achievement list
+script 733 (void)
+{
+	 gvh_listtoggle[PlayerNumber()]=0;
+	 int alist_i=0;
+	 while (alist_i<alist_maxitems+1)
+	 {
+		HudMessage(s:"";HUDMSG_PLAIN, alist_i*2+NS_AchieveListStartID, CR_GOLD, 575.1, 100.1, 0.01, 0.01);
+		HudMessage(s:"";HUDMSG_PLAIN, alist_i*2+1+NS_AchieveListStartID, CR_GOLD, 575.1, 100.1, 0.01, 0.01);
+	    alist_i++;
+	 }
+	 terminate;
+}
+
+// Upon pressing the achievement left key
+script 734 (void) NET
+{
+	 if (gvh_listtoggle[PlayerNumber()]==1)
+	 {
+		 alist_page[PlayerNumber()]=alist_page[PlayerNumber()]-1;
+		 if (alist_page[PlayerNumber()]<0)
+			alist_page[PlayerNumber()]=alist_maxpage;
+		 LocalAmbientSound("Menu/Cursor", 127);
+		 ACS_ExecuteAlways(732,0);
+	 }
+}
+
+// Upon pressing the achievement right key
+script 735 (void) NET
+{
+	if (gvh_listtoggle[PlayerNumber()]==1)
+	{
+		 alist_page[PlayerNumber()]=alist_page[PlayerNumber()]+1;
+		 if (alist_page[PlayerNumber()]>alist_maxpage)
+			alist_page[PlayerNumber()]=0;
+		 LocalAmbientSound("Menu/Cursor", 127);
+		 ACS_ExecuteAlways(732,0);
+	}
+}
+
+// Engineer's shit dies
+Script 736 (int tid)
+{
+	Thing_Damage(tid+101, 999, "");
+	Thing_Damage(tid+201, 999, "");
+	Thing_Damage(tid+501, 999, "");
+}
+
+// Creeper life suction healer
+Script 737 (void)
+{
+	if (TerminateScript[737])
+		Terminate;
+    HealThing(15);
+	FadeTo(255, 0, 0, 0.3, 0.3);
+	delay (5);
+	FadeTo(255, 0, 0, 0.0, 0.3);
+}
+
+// Fade canceller
+Script 744 (void)
+{
+	if (TerminateScript[744])
+		Terminate;
+	FadeTo(0, 0, 0, 0.0, 0.0001);
+}
+
+// Gives a reload token to the activator
+Script 745 (void)
+{
+	if (TerminateScript[745])
+		Terminate;
+	switch (getPlayerClass(ActivatorTID())) {
+		case CLASSID_MARINE:
+			if ((CheckInventory("PistolReload") && CheckWeapon("DualPistols")) ||
+			    (CheckInventory("ShotgunReload") && CheckWeapon("Riotgun")))
+				    GiveInventory("ForceReload", 1);
+			break;
+		case CLASSID_ENGINEER:
+			if ((CheckInventory("NormalNailReload") > 0 & CheckWeapon("Nailgun")) ||
+				(CheckInventory("NailReload") > 0 & CheckWeapon("NailgunMG")))
+				GiveInventory("ForceReload", 1);
+			break;
+	}
+}
+
+// Ammo gain
+Script 746 (int type)
+{
+	if (TerminateScript[746])
+		Terminate;
+		
+	if ( type == 0 )
+	{
+		LocalAmbientSound("weapons/creepercharge", 127);
+		FadeTo(0, 255, 0, 0.1, 0.0);
+		Delay(5);
+		FadeTo(0, 255, 0, 0.0, 0.0);
+	}
+	else
+	if ( type == 1 )
+	{
+		FadeTo(0, 208, 0, 0.7, 0.6);
+		Delay(5);
+		FadeTo(0, 208, 0, 0.0, 0.6);
+	}
+}
+
+// Human ass kicking
+Script 748 OPEN
+{
+	if (TerminateScript[748])
+		Terminate;
+	if(GetCVar("winlimit") < 3)
+		Terminate;
+	if(Bluescore() == GetCVar("winlimit"))
+		if(Redscore() == 0) {
+			SetFont("BigFont");
+			SetHudSize(320, 240, 1);
+			HudMessageBold(s: "Flawless Human victory"; HUDMSG_PLAIN, 0, CR_GOLD, 160.0, 120.0, 5.0); 
+			Delay(35);
+//			AmbientSound("GhoulMajorFail", 127);
+			Terminate;
+		}
+	Delay(8);
+	Restart;
+}
+
+// Ghoul ass kicking
+Script 749 OPEN
+{
+	if (TerminateScript[749])
+		Terminate;
+	if(GetCVar("winlimit") < 3)
+		Terminate;
+	if(Bluescore() == 0)
+		if(Redscore() == GetCVar("winlimit")) {
+//			AmbientSound("HumanMajorFail", 127);
+			SetFont("BigFont");
+			SetHudSize(320, 240, 1);
+			HudMessageBold(s: "Flawless Ghoul victory"; HUDMSG_PLAIN, 0, CR_GOLD, 160.0, 120.0, 5.0); 
+			Terminate;
+		}
+	Delay(8);
+	Restart;
+}
+
+// Force grid termination failsafe
+Script 751 (void)
+{
+	HudMessage(s:" "; HUDMSG_PLAIN, NS_CyborgGridID, 0, -108.1, 0.1, 0.1); // Remove cyborg hud if there's any
+}
+
+// Cyborg full pulse sounder
+Script 752 OPEN CLIENTSIDE
+{
+	if(GetCVAR("gvh_nopulsesound") == 1)
+		Terminate;
+	
+	for (int i = TID_Start; i <= TID_Start + MaxPlayers; i++) {
+		if (CheckActorInventory(i, "CyborgShieldCharge") >= 100)
+			ThingSound(i, "cyborg/PulseReady", 127);
+		Delay (2);
+	}
+	Delay(1);
+	Restart;
+}
+
+Script 754 (void) // We don't want this to run more than once, so that it takes more than 1 at a time.
+{
+	if(CheckInventory("NoMore"))
+		Terminate;
+	int dimcount = CheckInventory("VisionDimmer");
+	while(dimcount > 0)
+	{
+		GiveInventory("NoMore", 1);
+		Delay(35);
+		TakeInventory("VisionDimmer", 1);
+		dimcount = CheckInventory("VisionDimmer");
+	}
+	TakeInventory("NoMore", 1);
+}
+
+Script 755 (void)
+{
+	int dimcount = CheckInventory("DimDurationEffect");
+	while(dimcount > 0)
+	{
+		GiveInventory("DimSmokeSpawner", 1);
+		SetFont("smallfont");
+		hudmessage(s:"Dim Vision Duration: \cd", d:dimcount, s:"\c-"; HUDMSG_PLAIN, 670, CR_RED, 1.5, -0.96, 1.5, 1.0, 1.0);
+		GiveInventory("DimGiver", 1);
+		Delay(5);
+		GiveInventory("DimGiver", 1);
+		Delay(5);
+		GiveInventory("DimGiver", 1);
+		Delay(5);
+		GiveInventory("DimGiver", 1);
+		Delay(5);
+		GiveInventory("DimGiver", 1);
+		Delay(5);
+		GiveInventory("DimGiver", 1);
+		Delay(5);
+		GiveInventory("DimGiver", 1);
+		Delay(5);
+		TakeInventory("DimDurationEffect", 1);
+		dimcount = CheckInventory("DimDurationEffect");
+	}
+}
+
+// Choke vomit sounder
+Script 757 (void)
+{
+	SetResultValue(0);
+	if (CheckInventory("VomitPoints") % 10 == 0)
+		SetResultValue(1);
+}
+
+// Sets an icefiend visible or invisible
+Script 758 (void)
+{
+	if(Timer() < 35*3)
+	{
+		SetFont("BIGFONT");
+		HudMessage(s: "Wait 3 seconds"; HUDMSG_PLAIN, 701, CR_LIGHTBLUE, 0.5, 0.1, 2.0);
+		Terminate;
+	}
+	int pn = PlayerNumber();
+	int tid = ActivatorTID();
+	
+	if (IcefiendCloaking[pn] || pn < 0 || !isPlayerClass(tid, CLASSID_NIGHTMARE))
+		Terminate;
+	
+		// Do cloaking or uncloaking
+		if (!CheckActorInventory(tid, "IcefiendInvisible") && CheckActorInventory(tid, "InvisibleCounter") > 0) {
+			if (CheckActorInventory(tid, "IcefiendCloakCooldown"))
+				Terminate;
+			TakeInventory("DimDurationEffect", 100);
+			IcefiendCloaking[pn] = 1;
+			GiveActorInventory(tid, "IcefiendInvisible", 1);
+			ThingSound(tid, "IceFiendCloak", 127);
+			TakeActorInventory(tid, "InvisibleCounter", 1);
+			SetActorProperty(0, APROP_RenderStyle, STYLE_Translucent);
+			Delay(1);
+			for(int c = 0; c < 10; c++) {
+				SetActorProperty(0, APROP_Alpha, 0.9 - (0.1 * c));
+				Delay(2);
+			}
+			GiveInventory("InvisResist", 1);
+			SetActorProperty(0, APROP_Alpha, 0);
+			IcefiendCloaking[pn] = 0;
+		} else {
+			IcefiendCloaking[pn] = 1;
+			ThingSound(tid, "IceFiendUncloak", 45);
+			for(int u = 0; u < 10; u++) {
+				SetActorProperty(0, APROP_Alpha, 0.1 + (0.1 * u));
+				Delay(2);
+			}
+			TakeInventory("InvisResist", 1);
+			SetActorProperty(0, APROP_Alpha, 1.0);
+			GiveActorInventory(tid, "IcefiendCloakCooldown", 1);
+			ACS_executeAlways(908, 0, 7);
+			TakeActorInventory(tid, "IcefiendInvisible", 1);
+			Delay(4); // 13
+			IcefiendCloaking[pn] = 0;
+		}
+}
+
+// Cycle through players and decloak them if need be
+Script 759 OPEN
+{
+	for (int i = 0; i < MaxPlayers; i++) {
+		if(!isPlayerClass(i + TID_Start, CLASSID_NIGHTMARE) || GetActorProperty(i + TID_Start, APROP_Health) <= 0)
+			Continue;
+		if (!IcefiendCloaking[i] && (CheckActorInventory(i + TID_Start, "IcefiendInvisible") || GetActorProperty(i + TID_Start, APROP_Alpha) <= 0.9)) {
+			TakeActorInventory(i + TID_Start, "InvisibleCounter", 1);
+			if (CheckActorInventory(i + TID_Start, "InvisibleCounter") <= 0)
+				GiveActorInventory(i + TID_Start, "IcefiendForceCloakScript", 1); //ACS_ExecuteAlways(758, 0, i + TID_Start);
+		}
+	}
+	Delay(52);
+	Restart;
+}
+
+// Pressing use on a dispenser [NOTE: If you want to dispense 4 ammo types, increase array range]
+/* Optimize me later with:
+	DispenserIntegerData[Classsize][3][5]
+	> number of slots (marine = 3, barb = 1...etc)
+	- use this slot (0 or 1)
+	- ammo to give per each dispense
+	- max ammo for that weapon
+	- max dispenser count
+
+	DispenserStringData[ClassSive][3][3]
+	> slot number
+	- ammo type
+	- cant give more msg
+	- dispense # "THIS HERE" msg
+*/
+Script 763 (int dispenserNum)
+{
+	if (CheckInventory("IsGhoul") | CheckInventory("DispenserUseCooldown") | GetActorProperty(TID_START + PlayerNumber(), APROP_HEALTH) < 1 | PlayerNumber() < 0)
+		Terminate;
+		
+	int tid = ActivatorTID();
+	
+	int playerNum = PlayerNumber();
+	int giveResult = 0;
+	int maxedOut = 0;
+	int playdispsound = 0;
+	int msg1; int msg2; int msg3; int msg4;
+	
+	switch (CheckActorInventory(tid, "ClassID")) {
+		case CLASSID_NONE:
+			Terminate;
+		case CLASSID_MARINE:
+			// Shotgun [30]
+			giveResult = dispenserAmmoToGive(0, 5, 50, 15, CheckInventory("NewShell"), playerNum, dispenserNum);
+			if (giveResult == DSP_MAXEDOUT) {
+				SetHudSize(800, 600, 1);
+				HudMessage(s: "Maxed out on this item from the dispenser"; HUDMSG_FADEINOUT, NS_DispenseMsg, CR_YELLOW, 400.0, 20.0, 4.0, 0.4, 0.4);
+				msg1 = 1;
+			} else if (giveResult == DSP_CANTGIVEMORE) {
+				if (msg1 == 0)
+				{
+					SetHudSize(800, 600, 1);
+					HudMessage(s: "You have maximum shells, can not take anymore"; HUDMSG_FADEINOUT, NS_DispenseMsg, CR_ORANGE, 400.0, 20.0, 4.0, 0.4, 0.4);
+					maxedOut = false;
+				}
+			} else {
+				SetHudSize(800, 600, 1);
+				HudMessage(s: "You dispense ", d: giveResult, s: " shell(s)"; HUDMSG_FADEINOUT, NS_DispenseMsg, CR_WHITE, 400.0, 20.0, 4.0, 0.4, 0.4);
+				GiveInventory("NewShell", giveResult);
+				playdispsound = true;
+				maxedOut = false;
+			}
+			// Machinegun [100]
+			giveResult = dispenserAmmoToGive(1, 10, 200, 50, CheckInventory("NewClip"), playerNum, dispenserNum);
+			if (giveResult == DSP_MAXEDOUT) {
+				SetHudSize(800, 600, 1);
+				HudMessage(s: "Maxed out on this item from the dispenser"; HUDMSG_FADEINOUT, NS_DispenseMsg2, CR_YELLOW, 400.0, 20.0 + 8.0, 4.0, 0.4, 0.4);
+				msg2 = 1;
+			}  else if (giveResult == DSP_CANTGIVEMORE) {
+				if (msg2 == 0)
+				{
+					SetHudSize(800, 600, 1);
+					HudMessage(s: "You have maximum bullets, can not take anymore"; HUDMSG_FADEINOUT, NS_DispenseMsg2, CR_ORANGE, 400.0, 20.0 + 8.0, 4.0, 0.4, 0.4);
+					maxedOut = false;
+				}
+			} else {
+				SetHudSize(800, 600, 1);
+				HudMessage(s: "You dispense ", d: giveResult, s: " bullet(s)"; HUDMSG_FADEINOUT, NS_DispenseMsg2, CR_WHITE, 400.0, 20.0 + 8.0, 4.0, 0.4, 0.4);
+				GiveInventory("NewClip", giveResult);
+				playdispsound = true;
+				maxedOut = false;
+			}
+			// Grenades [10]
+			giveResult = dispenserAmmoToGive(2, 1, 10, 4, CheckInventory("GrenadeAmmo"), playerNum, dispenserNum);
+			if (giveResult == DSP_MAXEDOUT) {
+				SetHudSize(800, 600, 1);
+				HudMessage(s: "Maxed out on this item from the dispenser"; HUDMSG_FADEINOUT, NS_DispenseMsg3, CR_YELLOW, 400.0, 20.0 + 16.0, 4.0, 0.4, 0.4);
+				msg3 = 1;
+			} else if (giveResult == DSP_CANTGIVEMORE) { // This will obviously not be fulfilled as you start with 5 now...
+				if (msg3 == 0)
+				{
+					SetHudSize(800, 600, 1);
+					HudMessage(s: "You have maximum grenades, can not take anymore."; HUDMSG_FADEINOUT, NS_DispenseMsg3, CR_ORANGE, 400.0, 20.0 + 16.0, 4.0, 0.4, 0.4);
+					maxedOut = false;
+				}
+			} else {
+				SetHudSize(800, 600, 1);
+				HudMessage(s: "You dispense ", d: giveResult, s: " grenade)"; HUDMSG_FADEINOUT, NS_DispenseMsg3, CR_WHITE, 400.0, 20.0 + 16.0, 4.0, 0.4, 0.4);
+				GiveInventory("GrenadeAmmo", giveResult);
+				playdispsound = true;
+				maxedOut = false;
+			}
+			// Stimpack [2]
+			giveResult = dispenserAmmoToGive(3, 1, 6, 2, CheckInventory("DispenserMedKit"), playerNum, dispenserNum);
+			if (giveResult == DSP_MAXEDOUT) {
+				SetHudSize(800, 600, 1);
+				HudMessage(s: "Maxed out on this item from the dispenser"; HUDMSG_FADEINOUT, NS_DispenseMsg4, CR_YELLOW, 400.0, 20.0 + 24.0, 4.0, 0.4, 0.4);
+				msg4 = 1;
+			} else if (giveResult == DSP_CANTGIVEMORE) {
+				if (msg4 == 0)
+				{
+					SetHudSize(800, 600, 1);
+					HudMessage(s: "You have maximum stimpacks, can not take anymore"; HUDMSG_FADEINOUT, NS_DispenseMsg4, CR_ORANGE, 400.0, 20.0 + 24.0, 4.0, 0.4, 0.4);
+					maxedOut = false;
+				}
+			} else {
+				SetHudSize(800, 600, 1);
+				HudMessage(s: "You dispense ", d: giveResult, s: " Medkit"; HUDMSG_FADEINOUT, NS_DispenseMsg4, CR_WHITE, 400.0, 20.0 + 24.0, 4.0, 0.4, 0.4);
+				GiveInventory("DispenserMedKit", giveResult);
+				playdispsound = true;
+				maxedOut = false;
+			}
+			
+			if ( msg1 == 1 && msg2 == 1 && msg3 == 1 && msg4 == 1)
+				maxedOut = true;
+			
+			break;
+		case CLASSID_HUNTER:
+			// Arrows [35]
+			giveResult = dispenserAmmoToGive(0, 2, 35, 10, CheckInventory("ArrowSingle"), playerNum, dispenserNum);
+			if (giveResult == DSP_MAXEDOUT) {
+				SetHudSize(800, 600, 1);
+				HudMessage(s: "Maxed out on this item from the dispenser"; HUDMSG_FADEINOUT, NS_DispenseMsg, CR_YELLOW, 400.0, 20.0, 4.0, 0.4, 0.4);
+				msg1 = 1;
+			} else if (giveResult == DSP_CANTGIVEMORE) {
+				if (msg1 == 0)
+				{
+					SetHudSize(800, 600, 1);
+					HudMessage(s: "You have maximum arrows, can not take anymore"; HUDMSG_FADEINOUT, NS_DispenseMsg, CR_ORANGE, 400.0, 20.0, 4.0, 0.4, 0.4);
+					maxedOut = false;
+				}
+			} else {
+				SetHudSize(800, 600, 1);
+				HudMessage(s: "You dispense ", d: giveResult, s: " arrow(s)"; HUDMSG_FADEINOUT, NS_DispenseMsg, CR_WHITE, 400.0, 20.0, 4.0, 0.4, 0.4);
+				GiveInventory("ArrowSingle", giveResult);
+				playdispsound = true;
+				maxedOut = false;
+			}
+			// Stimpack [2]
+			giveResult = dispenserAmmoToGive(2, 1, 6, 2, CheckInventory("DispenserMedKit"), playerNum, dispenserNum);
+			if (giveResult == DSP_MAXEDOUT) {
+				SetHudSize(800, 600, 1);
+				HudMessage(s: "Maxed out on this item from the dispenser"; HUDMSG_FADEINOUT, NS_DispenseMsg2, CR_YELLOW, 400.0, 20.0 + 8.0, 4.0, 0.4, 0.4);
+				msg2 = 1;
+			} else if (giveResult == DSP_CANTGIVEMORE) {
+				if (msg2 == 0)
+				{
+					SetHudSize(800, 600, 1);
+					HudMessage(s: "You have maximum stimpacks, can not take anymore"; HUDMSG_FADEINOUT, NS_DispenseMsg2, CR_ORANGE, 400.0, 20.0 + 8.0, 4.0, 0.4, 0.4);
+					maxedOut = false;
+				}
+			} else {
+				SetHudSize(800, 600, 1);
+				HudMessage(s: "You dispense ", d: giveResult, s: " Medkit"; HUDMSG_FADEINOUT, NS_DispenseMsg2, CR_WHITE, 400.0, 20.0 + 8.0, 4.0, 0.4, 0.4);
+				GiveInventory("DispenserMedKit", giveResult);
+				playdispsound = true;
+				maxedOut = false;
+			}
+			
+			if ( msg1 == 1 && msg2 == 1)
+				maxedOut = true;
+			
+			break;
+		case CLASSID_CYBORG:
+			// Jetfuel [150]
+			giveResult = dispenserAmmoToGive(0, 5, 150, 25, CheckInventory("CyborgFuel"), playerNum, dispenserNum);
+			if (giveResult == DSP_MAXEDOUT) {
+				SetHudSize(800, 600, 1);
+				HudMessage(s: "Maxed out on this item from the dispenser"; HUDMSG_FADEINOUT, NS_DispenseMsg, CR_YELLOW, 400.0, 20.0, 4.0, 0.4, 0.4);
+				msg1 = 1;
+			} else if (giveResult == DSP_CANTGIVEMORE) {
+				if (msg1 == 0)
+				{
+					SetHudSize(800, 600, 1);
+					HudMessage(s: "You have maximum fuel, can not take anymore"; HUDMSG_FADEINOUT, NS_DispenseMsg, CR_ORANGE, 400.0, 20.0, 4.0, 0.4, 0.4);
+					maxedOut = false;
+				}
+			} else {
+				SetHudSize(800, 600, 1);
+				HudMessage(s: "You dispense ", d: giveResult, s: " fuel"; HUDMSG_FADEINOUT, NS_DispenseMsg, CR_WHITE, 400.0, 20.0, 4.0, 0.4, 0.4);
+				GiveInventory("CyborgFuel", giveResult);
+				playdispsound = true;
+				maxedOut = false;
+			}
+			// Stimpack [2]
+			giveResult = dispenserAmmoToGive(2, 1, 6, 2, CheckInventory("DispenserMedKit"), playerNum, dispenserNum);
+			if (giveResult == DSP_MAXEDOUT) {
+				SetHudSize(800, 600, 1);
+				HudMessage(s: "Maxed out on this item from the dispenser"; HUDMSG_FADEINOUT, NS_DispenseMsg2, CR_YELLOW, 400.0, 20.0 + 8.0, 4.0, 0.4, 0.4);
+				msg2 = 1;
+			} else if (giveResult == DSP_CANTGIVEMORE) {
+				if (msg2 == 0)
+				{
+					SetHudSize(800, 600, 1);
+					HudMessage(s: "You have maximum stimpacks, can not take anymore"; HUDMSG_FADEINOUT, NS_DispenseMsg2, CR_ORANGE, 400.0, 20.0 + 8.0, 4.0, 0.4, 0.4);
+					maxedOut = false;
+				}
+			} else {
+				SetHudSize(800, 600, 1);
+				HudMessage(s: "You dispense ", d: giveResult, s: " Medkit"; HUDMSG_FADEINOUT, NS_DispenseMsg2, CR_WHITE, 400.0, 20.0 + 8.0, 4.0, 0.4, 0.4);
+				GiveInventory("DispenserMedKit", giveResult);
+				playdispsound = true;
+				maxedOut = false;
+			}
+			
+			if ( msg1 == 1 && msg2 == 1)
+				maxedOut = true;
+			
+			break;
+		case CLASSID_GHOSTBUSTER:
+			// Ghost Trap [10]
+			giveResult = dispenserAmmoToGive(0, 1, 10, 4, CheckInventory("TrapAmmo"), playerNum, dispenserNum);			
+			if (giveResult == DSP_MAXEDOUT) {
+				SetHudSize(800, 600, 1);
+				HudMessage(s: "Maxed out on this item from the dispenser"; HUDMSG_FADEINOUT, NS_DispenseMsg, CR_YELLOW, 400.0, 20.0, 4.0, 0.4, 0.4);
+				msg1 = 1;
+			} else if (giveResult == 0) {
+				if (msg1 == 0)
+				{
+					SetHudSize(800, 600, 1);
+					HudMessage(s: "You have maximum traps, can not take anymore"; HUDMSG_FADEINOUT, NS_DispenseMsg, CR_YELLOW, 400.0, 20.0, 4.0, 0.4, 0.4);
+					maxedOut = false;
+				}
+			} else {
+				SetHudSize(800, 600, 1);
+				HudMessage(s: "You dispense ", d: giveResult, s: " ghost trap"; HUDMSG_FADEINOUT, NS_DispenseMsg, CR_WHITE, 400.0, 20.0, 4.0, 0.4, 0.4);
+				GiveInventory("TrapAmmo", giveResult);
+				playdispsound = true;
+				maxedOut = false;
+			}
+			// Stimpack [2]
+			giveResult = dispenserAmmoToGive(1, 1, 6, 2, CheckInventory("DispenserMedKit"), playerNum, dispenserNum);
+			if (giveResult == DSP_MAXEDOUT) {
+				SetHudSize(800, 600, 1);
+				HudMessage(s: "Maxed out on this item from the dispenser"; HUDMSG_FADEINOUT, NS_DispenseMsg2, CR_YELLOW, 400.0, 20.0 + 8.0, 4.0, 0.4, 0.4);
+				msg2 = 1;
+			} else if (giveResult == DSP_CANTGIVEMORE) {
+				if (msg2 == 0)
+				{
+					SetHudSize(800, 600, 1);
+					HudMessage(s: "You have maximum stimpacks, can not take anymore"; HUDMSG_FADEINOUT, NS_DispenseMsg2, CR_ORANGE, 400.0, 20.0 + 8.0, 4.0, 0.4, 0.4);
+					maxedOut = false;
+				}
+			} else {
+				SetHudSize(800, 600, 1);
+				HudMessage(s: "You dispense ", d: giveResult, s: " Medkit"; HUDMSG_FADEINOUT, NS_DispenseMsg2, CR_WHITE, 400.0, 20.0 + 8.0, 4.0, 0.4, 0.4);
+				GiveInventory("DispenserMedKit", giveResult);
+				playdispsound = true;
+				maxedOut = false;
+			}
+			
+			if ( msg1 == 1 && msg2 == 1 )
+				maxedOut = true;
+			
+		break;
+		case CLASSID_ENGINEER:
+		
+			if(CheckInventory("AllowUpgrade"))
+			{
+				if(CheckInventory("WrenchAmmo") >= 75)
+				{
+					if(CheckInventory("AllowNail") && CheckWeapon("Nailgun"))
+					{
+						SetHudSize(800, 600, 1);
+						HudMessage(s: "Upgrade Complete!"; HUDMSG_FADEINOUT, NS_DispenseMsg, CR_GREEN, 400.0, 10.0, 4.0, 0.4, 0.4);
+						TakeInventory("Nailgun", 1);
+						GiveInventory("NailGunMG", 1);
+						GiveInventory("ForceReloadItemEngy", 1);
+						TakeInventory("WrenchAmmo", 75);
+						TakeInventory("AllowUpgrade", 1);
+						TakeInventory("AllowNail", 1);
+						Delay(5);
+						SetWeapon("NailgunMG");
+					}
+					
+					if(CheckInventory("AllowSaw") && CheckWeapon("SawLauncher"))
+					{
+						if(CheckInventory("WrenchAmmo") >= 75) // LAZY CODING!!
+						{
+							SetHudSize(800, 600, 1);
+							HudMessage(s: "Upgrade Complete!"; HUDMSG_FADEINOUT, NS_DispenseMsg, CR_GREEN, 400.0, 10.0, 4.0, 0.4, 0.4);
+							TakeInventory("SawLauncher", 1);
+							GiveInventory("Pulverizer", 1);
+							TakeInventory("WrenchAmmo", 75);
+							TakeInventory("AllowUpgrade", 1);
+							TakeInventory("AllowSaw", 1);
+						}
+					}
+					
+					if(CheckWeapon("Nailgun"))
+					{
+						SetHudSize(800, 600, 1);
+						HudMessage(s: "Are you sure you wish to upgrade your Nailgun to the Nail MachineGun?"; HUDMSG_FADEINOUT, NS_DispenseMsg, CR_GREEN, 400.0, 10.0, 4.0, 0.4, 0.4);
+						GiveInventory("AllowNail", 1);
+					}
+					else
+					if(CheckWeapon("SawLauncher"))
+					{
+						SetHudSize(800, 600, 1);
+						HudMessage(s: "Are you sure you wish to upgrade your Saw Launcher to the Pulverizer?"; HUDMSG_FADEINOUT, NS_DispenseMsg, CR_GREEN, 400.0, 10.0, 4.0, 0.4, 0.4);
+						GiveInventory("AllowSaw", 1);
+					}
+				}
+				else
+				{
+					SetHudSize(800, 600, 1);
+					HudMessage(s: "You need to have 75 metal for an upgrade"; HUDMSG_FADEINOUT, NS_DispenseMsg, CR_RED, 400.0, 10.0, 4.0, 0.4, 0.4);
+				}
+			}
+			else
+			{
+				// Metal [200]
+				giveResult = dispenserAmmoToGive(0, 25, 200, 75, CheckInventory("WrenchAmmo"), playerNum, dispenserNum);
+				if (giveResult == DSP_MAXEDOUT) {
+					SetHudSize(800, 600, 1);
+					HudMessage(s: "Maxed out on this item from the dispenser"; HUDMSG_FADEINOUT, NS_DispenseMsg, CR_YELLOW, 400.0, 20.0, 4.0, 0.4, 0.4);
+					msg1 = 1;
+				} else if (giveResult == 0) {
+					if (msg1 == 0)
+					{
+						SetHudSize(800, 600, 1);
+						HudMessage(s: "You have maximum metal, can not take anymore"; HUDMSG_FADEINOUT, NS_DispenseMsg, CR_YELLOW, 400.0, 20.0, 4.0, 0.4, 0.4);
+						maxedOut = false;
+					}
+				} else {
+					SetHudSize(800, 600, 1);
+					HudMessage(s: "You dispense ", d: giveResult, s: " bulding metal"; HUDMSG_FADEINOUT, NS_DispenseMsg, CR_WHITE, 400.0, 20.0, 4.0, 0.4, 0.4);
+					GiveInventory("WrenchAmmo", giveResult);
+					playdispsound = true;
+					maxedOut = false;
+				}
+				// Saw Blade [5]
+				giveResult = dispenserAmmoToGive(1, 1, 20, 5, CheckInventory("SawAmmo"), playerNum, dispenserNum);
+				if (giveResult == DSP_MAXEDOUT) {
+					SetHudSize(800, 600, 1);
+					HudMessage(s: "Maxed out on this item from the dispenser"; HUDMSG_FADEINOUT, NS_DispenseMsg2, CR_YELLOW, 400.0, 20.0 + 8.0, 4.0, 0.4, 0.4);
+					msg2 = 1;
+				} else if (giveResult == 0) {
+					if (msg2 == 0)
+					{
+						SetHudSize(800, 600, 1);
+						HudMessage(s: "You have maximum ammo, can not take anymore"; HUDMSG_FADEINOUT, NS_DispenseMsg2, CR_ORANGE, 400.0, 20.0 + 8.0, 4.0, 0.4, 0.4);
+						maxedOut = false;
+					}
+				} else {
+					SetHudSize(800, 600, 1);
+					HudMessage(s: "You dispense ", d: giveResult, s: " blade"; HUDMSG_FADEINOUT, NS_DispenseMsg2, CR_WHITE, 400.0, 20.0 + 8.0, 4.0, 0.4, 0.4);
+					GiveInventory("SawAmmo", giveResult);
+					playdispsound = true;
+					maxedOut = false;
+				}
+				// Stimpack [2]
+				giveResult = dispenserAmmoToGive(2, 1, 6, 2, CheckInventory("DispenserMedKit"), playerNum, dispenserNum);
+				if (giveResult == DSP_MAXEDOUT) {
+					SetHudSize(800, 600, 1);
+					HudMessage(s: "Maxed out on this item from the dispenser"; HUDMSG_FADEINOUT, NS_DispenseMsg3, CR_YELLOW, 400.0, 20.0 + 16.0, 4.0, 0.4, 0.4);
+					msg3 = 1;
+				} else if (giveResult == 0) {
+					if (msg3 == 0)
+					{
+						SetHudSize(800, 600, 1);
+						HudMessage(s: "You have maximum stimpacks, can not take anymore"; HUDMSG_FADEINOUT, NS_DispenseMsg3, CR_YELLOW, 400.0, 20.0 + 16.0, 4.0, 0.4, 0.4);
+						maxedOut = false;
+					}
+				} else {
+					SetHudSize(800, 600, 1);
+					HudMessage(s: "You dispense ", d: giveResult, s: " Medkit"; HUDMSG_FADEINOUT, NS_DispenseMsg3, CR_WHITE, 400.0, 20.0 + 16.0, 4.0, 0.4, 0.4);
+					GiveInventory("DispenserMedKit", giveResult);
+					
+					playdispsound = true;
+					maxedOut = false;
+				}
+				
+				if(!CheckInventory("DroneCapacityIncreased"))
+				{
+					SetHudSize(800, 600, 1);
+					HudMessage(s: "Drone capacity increased by 1"; HUDMSG_FADEINOUT, NS_DispenseMsg4, CR_WHITE, 400.0, 20.0 + 24.0, 4.0, 0.4, 0.4);				
+					GiveInventory("CanOneMoreDrone", 1);
+					GiveInventory("DroneCapacityIncreased", 1);
+				}
+				
+				if ( msg1 == 1 && msg2 == 1 && msg3 == 1)
+				{
+					maxedOut = true;
+					GiveInventory("AllowUpgrade", 1);
+				}
+			}
+			break;
+			case CLASSID_WITCH:
+				// Pellets [5]
+				giveResult = dispenserAmmoToGive(0, 5, 40, 5, CheckInventory("HeartSeekerAmmo"), playerNum, dispenserNum);
+				if (giveResult == DSP_MAXEDOUT) {
+					SetHudSize(800, 600, 1);
+					HudMessage(s: "Maxed out on this item from the dispenser"; HUDMSG_FADEINOUT, NS_DispenseMsg, CR_YELLOW, 400.0, 20.0, 4.0, 0.4, 0.4);
+					msg1 = 1;
+				} else if (giveResult == DSP_CANTGIVEMORE) {
+					if (msg1 == 0)
+					{
+						SetHudSize(800, 600, 1);
+						HudMessage(s: "You have maximum shells, can not take anymore"; HUDMSG_FADEINOUT, NS_DispenseMsg, CR_ORANGE, 400.0, 20.0, 4.0, 0.4, 0.4);
+						maxedOut = false;
+					}
+				} else {
+					SetHudSize(800, 600, 1);
+					HudMessage(s: "You dispense ", d: giveResult, s: " shells and 1 Explosive Cask"; HUDMSG_FADEINOUT, NS_DispenseMsg, CR_WHITE, 400.0, 20.0, 4.0, 0.4, 0.4);
+					GiveInventory("HeartSeekerAmmo", giveResult);
+					GiveInventory("FlaskT1", 1);
+					playdispsound = true;
+					maxedOut = false;
+				}
+				// Darts [24]
+				giveResult = dispenserAmmoToGive(1, 24, 200, 24, CheckInventory("Darts"), playerNum, dispenserNum);
+				if (giveResult == DSP_MAXEDOUT) {
+					SetHudSize(800, 600, 1);
+					HudMessage(s: "Maxed out on this item from the dispenser"; HUDMSG_FADEINOUT, NS_DispenseMsg2, CR_YELLOW, 400.0, 20.0 + 8.0, 4.0, 0.4, 0.4);
+					msg2 = 1;
+				} else if (giveResult == DSP_CANTGIVEMORE) {
+					if (msg2 == 0)
+					{
+						SetHudSize(800, 600, 1);
+						HudMessage(s: "You have maximum darts, can not take anymore"; HUDMSG_FADEINOUT, NS_DispenseMsg2, CR_ORANGE, 400.0, 20.0 + 8.0, 4.0, 0.4, 0.4);
+						maxedOut = false;
+					}
+				} else {
+					SetHudSize(800, 600, 1);
+					HudMessage(s: "You dispense ", d: giveResult, s: " darts and 1 Poison Cask"; HUDMSG_FADEINOUT, NS_DispenseMsg2, CR_WHITE, 400.0, 20.0 + 8.0, 4.0, 0.4, 0.4);
+					GiveInventory("Darts", giveResult);
+					GiveInventory("FlaskT2", 1);
+					playdispsound = true;
+					maxedOut = false;
+				}
+				// Hook [1]
+				giveResult = dispenserAmmoToGive(3, 1, 10, 1, CheckInventory("HookAmmo"), playerNum, dispenserNum);
+				if (giveResult == DSP_MAXEDOUT) {
+					SetHudSize(800, 600, 1);
+					HudMessage(s: "Maxed out on this item from the dispenser"; HUDMSG_FADEINOUT, NS_DispenseMsg4, CR_YELLOW, 400.0, 20.0 + 16.0, 4.0, 0.4, 0.4);
+					msg3 = 1;
+				} else if (giveResult == DSP_CANTGIVEMORE) {
+					if (msg3 == 0)
+					{
+						SetHudSize(800, 600, 1);
+						HudMessage(s: "You have maximum hooks, can not take anymore"; HUDMSG_FADEINOUT, NS_DispenseMsg4, CR_ORANGE, 400.0, 20.0 + 16.0, 4.0, 0.4, 0.4);
+						maxedOut = false;
+					}
+				} else {
+					SetHudSize(800, 600, 1);
+					HudMessage(s: "You dispense ", d: giveResult, s: " hook"; HUDMSG_FADEINOUT, NS_DispenseMsg4, CR_WHITE, 400.0, 20.0 + 16.0, 4.0, 0.4, 0.4);
+					GiveInventory("HookAmmo", giveResult);
+					GiveInventory("FlaskT3", 1);
+					playdispsound = true;
+					maxedOut = false;
+				}
+				// Stimpack [2]
+				giveResult = dispenserAmmoToGive(2, 1, 6, 2, CheckInventory("DispenserMedKit"), playerNum, dispenserNum);
+				if (giveResult == DSP_MAXEDOUT) {
+					SetHudSize(800, 600, 1);
+					HudMessage(s: "Maxed out on this item from the dispenser"; HUDMSG_FADEINOUT, NS_DispenseMsg3, CR_YELLOW, 400.0, 20.0 + 24.0, 4.0, 0.4, 0.4);
+					msg4 = 1;
+				} else if (giveResult == DSP_CANTGIVEMORE) {
+					if (msg4 == 0)
+					{
+						SetHudSize(800, 600, 1);
+						HudMessage(s: "You have maximum stimpacks, can not take anymore"; HUDMSG_FADEINOUT, NS_DispenseMsg3, CR_ORANGE, 400.0, 20.0 + 24.0, 4.0, 0.4, 0.4);
+						maxedOut = false;
+					}
+				} else {
+					SetHudSize(800, 600, 1);
+					HudMessage(s: "You dispense ", d: giveResult, s: " Medkit"; HUDMSG_FADEINOUT, NS_DispenseMsg3, CR_WHITE, 400.0, 20.0 + 24.0, 4.0, 0.4, 0.4);
+					GiveInventory("DispenserMedKit", giveResult);
+					playdispsound = true;
+					maxedOut = false;
+				}
+				
+				if (msg1 == 1 && msg2 == 1 && msg3 == 1 && msg4 == 1)
+					maxedOut = true;
+			break;
+		case CLASSID_PLANEWALKER:
+			giveResult = dispenserAmmoToGive(0, 5, 50, 20, CheckInventory("NewShell"), playerNum, dispenserNum);
+			if (giveResult == DSP_MAXEDOUT) {
+				SetHudSize(800, 600, 1);
+				HudMessage(s: "Maxed out on this item from the dispenser"; HUDMSG_FADEINOUT, NS_DispenseMsg, CR_YELLOW, 400.0, 20.0, 4.0, 0.4, 0.4);
+				msg1 = 1;
+			} else if (giveResult == DSP_CANTGIVEMORE) {
+				if (msg1 == 0)
+				{
+					SetHudSize(800, 600, 1);
+					HudMessage(s: "You have maximum shells, can not take anymore"; HUDMSG_FADEINOUT, NS_DispenseMsg, CR_ORANGE, 400.0, 20.0, 4.0, 0.4, 0.4);
+					maxedOut = false;
+				}
+			} else {
+				SetHudSize(800, 600, 1);
+				HudMessage(s: "You dispense ", d: giveResult, s: " shells"; HUDMSG_FADEINOUT, NS_DispenseMsg, CR_WHITE, 400.0, 20.0, 4.0, 0.4, 0.4);
+				GiveInventory("HammerAmmo", giveResult);
+				playdispsound = true;
+				maxedOut = false;
+			}
+			// Stimpack [2]
+			giveResult = dispenserAmmoToGive(2, 1, 6, 2, CheckInventory("DispenserMedKit"), playerNum, dispenserNum);
+			if (giveResult == DSP_MAXEDOUT) {
+				SetHudSize(800, 600, 1);
+				HudMessage(s: "Maxed out on this item from the dispenser"; HUDMSG_FADEINOUT, NS_DispenseMsg2, CR_YELLOW, 400.0, 20.0 + 8.0, 4.0, 0.4, 0.4);
+				msg2 = 1;
+			} else if (giveResult == DSP_CANTGIVEMORE) {
+				if (msg2 == 0)
+				{
+					SetHudSize(800, 600, 1);
+					HudMessage(s: "You have maximum stimpacks, can not take anymore"; HUDMSG_FADEINOUT, NS_DispenseMsg2, CR_ORANGE, 400.0, 20.0 + 8.0, 4.0, 0.4, 0.4);
+					maxedOut = false;
+				}
+			} else {
+				SetHudSize(800, 600, 1);
+				HudMessage(s: "You dispense ", d: giveResult, s: " Medkit"; HUDMSG_FADEINOUT, NS_DispenseMsg2, CR_WHITE, 400.0, 20.0 + 8.0, 4.0, 0.4, 0.4);
+				GiveInventory("DispenserMedKit", giveResult);
+				playdispsound = true;
+				maxedOut = false;
+			}
+			
+			if ( msg1 == 1 && msg2 == 1 )
+				maxedOut = true;
+			
+			break;
+		case CLASSID_WARLOCK:
+			// Lightning [10 + cap]
+			giveResult = dispenserAmmoToGive(0, 1, 10, 5, CheckInventory("LightningAmmo"), playerNum, dispenserNum);
+			if (giveResult == DSP_MAXEDOUT) {
+				SetHudSize(800, 600, 1);
+				HudMessage(s: "Maxed out on this item from the dispenser"; HUDMSG_FADEINOUT, NS_DispenseMsg, CR_YELLOW, 400.0, 20.0, 4.0, 0.4, 0.4);
+				msg1 = 1;
+			} else if (giveResult == 0) {
+				if (msg1 == 0)
+				{			
+					SetHudSize(800, 600, 1);
+					HudMessage(s: "You have maximum lightning mana, can not take anymore"; HUDMSG_FADEINOUT, NS_DispenseMsg, CR_ORANGE, 400.0, 20.0, 4.0, 0.4, 0.4);
+					maxedOut = false;
+				}
+			} else {
+				SetHudSize(800, 600, 1);
+				HudMessage(s: "You dispense ", d: giveResult, s: " lightning mana"; HUDMSG_FADEINOUT, NS_DispenseMsg, CR_WHITE, 400.0, 20.0, 4.0, 0.4, 0.4);
+				GiveInventory("LightningAmmo", giveResult);
+				playdispsound = true;
+				maxedOut = false;
+			}
+			// Fireammo [50]
+			giveResult = dispenserAmmoToGive(1, 5, 50, 25, CheckInventory("FirestaffAmmo"), playerNum, dispenserNum);
+			if (giveResult == DSP_MAXEDOUT) {
+				SetHudSize(800, 600, 1);
+				HudMessage(s: "Maxed out on this item from the dispenser"; HUDMSG_FADEINOUT, NS_DispenseMsg2, CR_YELLOW, 400.0, 20.0 + 8.0, 4.0, 0.4, 0.4);
+				msg2 = 1;
+			} else if (giveResult == 0) {
+				if (msg2 == 0)
+				{			
+					SetHudSize(800, 600, 1);
+					HudMessage(s: "You have maximum fire mana, can not take anymore"; HUDMSG_FADEINOUT, NS_DispenseMsg2, CR_ORANGE, 400.0, 20.0 + 8.0, 4.0, 0.4, 0.4);
+					maxedOut = false;
+				}
+			} else {
+				SetHudSize(800, 600, 1);
+				HudMessage(s: "You dispense ", d: giveResult, s: " fire mana"; HUDMSG_FADEINOUT, NS_DispenseMsg2, CR_WHITE, 400.0, 20.0 + 8.0, 4.0, 0.4, 0.4);
+				GiveInventory("FirestaffAmmo", giveResult);
+				playdispsound = true;
+				maxedOut = false;
+			}
+			// Stimpack [2]
+			giveResult = dispenserAmmoToGive(2, 1, 6, 2, CheckInventory("DispenserMedKit"), playerNum, dispenserNum);
+			if (giveResult == DSP_MAXEDOUT) {
+				SetHudSize(800, 600, 1);
+				HudMessage(s: "Maxed out on this item from the dispenser"; HUDMSG_FADEINOUT, NS_DispenseMsg3, CR_YELLOW, 400.0, 20.0 + 16.0, 4.0, 0.4, 0.4);
+				msg3 = 1;
+			} else if (giveResult == 0) {
+				if (msg3 == 0)
+				{
+					SetHudSize(800, 600, 1);
+					HudMessage(s: "You have maximum stimpacks, can not take anymore"; HUDMSG_FADEINOUT, NS_DispenseMsg3, CR_YELLOW, 400.0, 20.0 + 16.0, 4.0, 0.4, 0.4);
+					maxedOut = false;
+				}
+			} else {
+				SetHudSize(800, 600, 1);
+				HudMessage(s: "You dispense ", d: giveResult, s: " Medkit"; HUDMSG_FADEINOUT, NS_DispenseMsg3, CR_WHITE, 400.0, 20.0 + 16.0, 4.0, 0.4, 0.4);
+				GiveInventory("DispenserMedKit", giveResult);
+				playdispsound = true;
+				maxedOut = false;
+			}
+			
+			if (msg1 == 1 && msg2 == 1 && msg3 == 1)
+				maxedOut = true;
+			
+			break;
+		case CLASSID_PROTECTOR:
+			// Lightning Cell [10 + cap]
+			giveResult = dispenserAmmoToGive(0, 1, 10, 5, CheckInventory("LightningCell"), playerNum, dispenserNum);
+			if (giveResult == DSP_MAXEDOUT) {
+				SetHudSize(800, 600, 1);
+				HudMessage(s: "Maxed out on this item from the dispenser"; HUDMSG_FADEINOUT, NS_DispenseMsg, CR_YELLOW, 400.0, 20.0, 4.0, 0.4, 0.4);
+				msg1 = 1;
+			} else if (giveResult == 0) {
+				if (msg1 == 0)
+				{			
+					SetHudSize(800, 600, 1);
+					HudMessage(s: "You have maximum lightning cells, can not take anymore"; HUDMSG_FADEINOUT, NS_DispenseMsg, CR_ORANGE, 400.0, 20.0, 4.0, 0.4, 0.4);
+					maxedOut = false;
+				}
+			} else {
+				SetHudSize(800, 600, 1);
+				HudMessage(s: "You dispense ", d: giveResult, s: " lightning cells"; HUDMSG_FADEINOUT, NS_DispenseMsg, CR_WHITE, 400.0, 20.0, 4.0, 0.4, 0.4);
+				GiveInventory("LightningCell", giveResult);
+				playdispsound = true;
+				maxedOut = false;
+			}
+			// Missile [80]
+			giveResult = dispenserAmmoToGive(1, 2, 80, 20, CheckInventory("PMissiles"), playerNum, dispenserNum);
+			if (giveResult == DSP_MAXEDOUT) {
+				SetHudSize(800, 600, 1);
+				HudMessage(s: "Maxed out on this item from the dispenser"; HUDMSG_FADEINOUT, NS_DispenseMsg2, CR_YELLOW, 400.0, 20.0 + 8.0, 4.0, 0.4, 0.4);
+				msg2 = 1;
+			} else if (giveResult == 0) {
+				if (msg2 == 0)
+				{			
+					SetHudSize(800, 600, 1);
+					HudMessage(s: "You have maximum mini-missiles, can not take anymore"; HUDMSG_FADEINOUT, NS_DispenseMsg2, CR_ORANGE, 400.0, 20.0 + 8.0, 4.0, 0.4, 0.4);
+					maxedOut = false;
+				}
+			} else {
+				SetHudSize(800, 600, 1);
+				HudMessage(s: "You dispense ", d: giveResult, s: " mini-missiles"; HUDMSG_FADEINOUT, NS_DispenseMsg2, CR_WHITE, 400.0, 20.0 + 8.0, 4.0, 0.4, 0.4);
+				GiveInventory("PMissiles", giveResult);
+				playdispsound = true;
+				maxedOut = false;
+			}
+			// Stimpack [2]
+			giveResult = dispenserAmmoToGive(2, 1, 6, 2, CheckInventory("DispenserMedKit"), playerNum, dispenserNum);
+			if (giveResult == DSP_MAXEDOUT) {
+				SetHudSize(800, 600, 1);
+				HudMessage(s: "Maxed out on this item from the dispenser"; HUDMSG_FADEINOUT, NS_DispenseMsg3, CR_YELLOW, 400.0, 20.0 + 16.0, 4.0, 0.4, 0.4);
+				msg3 = 1;
+			} else if (giveResult == 0) {
+				if (msg3 == 0)
+				{
+					SetHudSize(800, 600, 1);
+					HudMessage(s: "You have maximum stimpacks, can not take anymore"; HUDMSG_FADEINOUT, NS_DispenseMsg3, CR_YELLOW, 400.0, 20.0 + 16.0, 4.0, 0.4, 0.4);
+					maxedOut = false;
+				}
+			} else {
+				SetHudSize(800, 600, 1);
+				HudMessage(s: "You dispense ", d: giveResult, s: " Medkit"; HUDMSG_FADEINOUT, NS_DispenseMsg3, CR_WHITE, 400.0, 20.0 + 16.0, 4.0, 0.4, 0.4);
+				GiveInventory("DispenserMedKit", giveResult);
+				playdispsound = true;
+				maxedOut = false;
+			}
+			
+			if (msg1 == 1 && msg2 == 1 && msg3 == 1)
+				maxedOut = true;
+			break;
+	}
+	if (maxedOut) {
+		SetHudSize(800, 600, 1);
+		HudMessage(s: "You've taken all you can from this dispenser"; HUDMSG_FADEINOUT, NS_DispenseMsg, CR_RED, 400.0, 20.0, 4.0, 0.4, 0.4);
+		HudMessage(s: ""; HUDMSG_FADEINOUT, NS_DispenseMsg2, CR_RED, 400.0, 20.0, 4.0, 0.4, 0.4);
+		HudMessage(s: ""; HUDMSG_FADEINOUT, NS_DispenseMsg3, CR_RED, 400.0, 20.0, 4.0, 0.4, 0.4);
+		HudMessage(s: ""; HUDMSG_FADEINOUT, NS_DispenseMsg4, CR_RED, 400.0, 20.0, 4.0, 0.4, 0.4);
+	}			
+	if (playdispsound)
+		LocalAmbientSound("DispenserGive", 127);
+	GiveInventory("DispenserUseCooldown", 1);
+}
+
+// Engineer wrench item changer
+Script 764 (int type)
+{
+	if(type == 0)
+	{
+		if(CheckInventory("WrenchMode") == 1) {
+			SetHudSize(800, 600, 1);
+			HudMessage(s: "Dispenser mode active (100)"; HUDMSG_PLAIN, NS_HealMsg, CR_GOLD, 400.0, 60.0, 5.0);
+		}
+
+		if(CheckInventory("WrenchMode") == 2) {
+			SetHudSize(800, 600, 1);
+			HudMessage(s: "Drone mode active (50)"; HUDMSG_PLAIN, NS_HealMsg, CR_GOLD, 400.0, 60.0, 5.0);	
+		}
+
+		if(CheckInventory("WrenchMode") == 3) {
+			TakeInventory("WrenchMode", 5);
+			SetHudSize(800, 600, 1);
+			HudMessage(s: "Sentry mode active (200)"; HUDMSG_PLAIN, NS_HealMsg, CR_GOLD, 400.0, 60.0, 5.0);	
+		}
+	}
+	else
+	if(type == 1)
+	{
+		SetHudSize(800, 600, 1);
+		HudMessage(s: "You need 50 metal for a drone"; HUDMSG_PLAIN, NS_HealMsg, CR_GOLD, 400.0, 60.0, 5.0);	
+	}
+	else
+	if(type == 2)
+	{
+		SetHudSize(800, 600, 1);
+		HudMessage(s: "You need 100 metal for a dispenser"; HUDMSG_PLAIN, NS_HealMsg, CR_GOLD, 400.0, 60.0, 5.0);	
+	}
+	else
+	if(type == 3)
+	{
+		SetHudSize(800, 600, 1);
+		HudMessage(s: "You need 200 metal for a sentry"; HUDMSG_PLAIN, NS_HealMsg, CR_GOLD, 400.0, 60.0, 5.0);	
+	}	
+	else
+	if(type == 4)
+	{
+		SetHudSize(800, 600, 1);
+		HudMessage(s: "You have reached the drone limit"; HUDMSG_PLAIN, NS_HealMsg, CR_GOLD, 400.0, 60.0, 5.0);	
+	}	
+	else
+	if(type == 5)
+	{
+		SetHudSize(800, 600, 1);
+		HudMessage(s: "You have already made a sentry!"; HUDMSG_PLAIN, NS_HealMsg, CR_GOLD, 400.0, 60.0, 5.0);	
+	}	
+	else
+	if(type == 6)
+	{
+		SetHudSize(800, 600, 1);
+		HudMessage(s: "You have already made a dispenser!"; HUDMSG_PLAIN, NS_HealMsg, CR_GOLD, 400.0, 60.0, 5.0);	
+	}		
+}
+
+// Sets translation for the sentry and dispenser
+Script 765 (int engineerItemDeath)
+{
+	int p = ActivatorTID();
+	int pnum = PlayerNumber();
+	if (engineerItemDeath == 0) {
+		Thing_ChangeTID(1100, 1101+pnum);
+		GiveActorInventory(p, "DispenserHudData", 1);
+		Thing_SetTranslation(1101+pnum, -1);
+	} else {
+	    Thing_ChangeTID(1200, 1201+pnum);
+		GiveActorInventory(p, "SentryHudData", 1);
+		Thing_SetTranslation(1201+pnum, -1);
+	}
+}
+
+// Dispenser/Sentry monitor for the player
+Script 766 (int type)
+{
+	if(CheckInventory("GhoulTeam") == 1)
+		Terminate;
+	
+	int tid = ActivatorTID();
+	int playerNum = PlayerNumber();
+	switch (type) {
+	case 0:
+		if (GetActorProperty(tid, APROP_HEALTH) <= 0)
+		{
+				Thing_Damage(tid + 100, 10000, 0);
+			for (int z = 0; z < 5; z++) {
+				HudMessage(s: "Dispenser destroyed!"; HUDMSG_PLAIN, NS_DispenserHudMsg, CR_RED, 0.1, 290.1, 0.3);
+				Delay(23);
+			}
+			GiveActorInventory(tid, "AllowDispenserCreation", 1);
+			Terminate;
+		}
+	break;
+	case 1:	
+			if(CheckActorInventory(tid, "TotalKillCount") >= 5 && CheckActorInventory(tid, "NoMoreLevel") == 0)
+			{
+				GiveActorInventory(tid, "Upgrading", 1);
+				GiveActorInventory(tid+201, "PlayerNumX", playernum+1);
+				SetActorState(tid + 201, "Levelup2", true);
+				GiveActorInventory(tid, "NoMoreLevel", 1);
+				SetFont("BIGFONT");
+				HudMessage(s:"Your sentry has leveled up!"; HUDMSG_PLAIN, 55, CR_RED, 1.5, 0.1, 3.0, 0.5, 1.0);
+				LocalAmbientSound("SentryLevelUp", 127);
+				Spawn("SentryLevelupEffect", GetActorX(tid+201), GetActorY(tid+201), GetActorZ(tid+201)+64);				
+				Delay(9);
+				TakeActorInventory(tid, "Upgrading", 1);				
+			}
+			if(CheckActorInventory(tid, "TotalKillCount") >= 3 && CheckActorInventory(tid, "TotalKillCount") < 5 && CheckActorInventory(tid, "LvL2Upgrade") == 0)
+			{
+				GiveActorInventory(tid, "Upgrading", 1);
+				GiveActorInventory(tid+201, "PlayerNum", playernum+1);
+				SetActorState(tid + 201, "Levelup", true);
+				GiveActorInventory(tid, "LvL2Upgrade", 1);
+				SetFont("BIGFONT");
+				HudMessage(s:"Your sentry has leveled up!"; HUDMSG_PLAIN, 55, CR_RED, 1.5, 0.1, 3.0, 0.5, 1.0);
+				LocalAmbientSound("SentryLevelUp", 127);
+				Spawn("SentryLevelupEffect", GetActorX(tid+201), GetActorY(tid+201), GetActorZ(tid+201)+64);				
+				Delay(9);
+				TakeActorInventory(tid, "Upgrading", 1);
+			}
+			
+		if (GetActorProperty(tid, APROP_HEALTH) <= 0)
+		{
+			Thing_Damage(tid + 200, 10000, 0);
+			
+			for (int z2 = 0; z2 < 5; z2++) {
+				HudMessage(s: "Sentry destroyed!"; HUDMSG_PLAIN, NS_SentryHudMsg, CR_RED, 0.1, 300.1, 0.3);
+				Delay(23);
+			}
+			GiveActorInventory(tid, "AllowSentryCreation", 1);
+			Terminate;
+		}	
+	break;
+	case 2:
+			if(CheckActorInventory(tid, "TotalKillCount") >= 5 && CheckActorInventory(tid, "NoMoreLevel") == 0)
+			{
+				SetActorState(tid + 501, "Levelup", true);
+				GiveActorInventory(tid, "NoMoreLevel", 1);
+				SetFont("BIGFONT");
+				HudMessage(s:"Your drone has leveled up!"; HUDMSG_PLAIN, 55, CR_RED, 1.5, 0.1, 3.0, 0.5, 1.0);		
+			}
+			if(CheckActorInventory(tid, "TotalKillCount") >= 3 && CheckActorInventory(tid, "TotalKillCount") < 5 && CheckActorInventory(tid, "LvL2DroneUpgrade") == 0)
+			{
+				SetActorState(tid + 501, "Levelup", true);
+				SetFont("BIGFONT");
+				HudMessage(s:"Your drone has leveled up!"; HUDMSG_PLAIN, 55, CR_RED, 1.5, 0.1, 3.0, 0.5, 1.0);
+				GiveInventory("LvL2DroneUpgrade", 1);
+			}
+	break;
+	}
+	Delay(4);
+	Restart;
+}
+
+// Warlock armor
+Script 767 (int type)
+{
+	if ( type == 1 ) // Can be potentially changed to make you do anything
+	{
+		GiveInventory("BoneShieldArmor", 1);
+		GiveInventory("Armor", 1);
+		FadeTo(128, 128, 128, 0.5, 0.5);
+		Delay(12);
+		FadeTo(128, 128, 128, 0, 0.5);
+		GiveInventory("WarlockBoneChecker", 2);
+	}
+}
+
+// Engineer kills his sentries
+Script 768 (int n) NET
+{
+	int tid = ActivatorTID();
+	if (!isPlayerClass(tid, CLASSID_ENGINEER))
+		Terminate;
+	if (n == 1 & GetActorProperty(tid + 201, APROP_HEALTH) > 0 ) {
+		SetFont("BIGFONT");
+		HudMessage(s:"Commencing self destruct sequence..."; HUDMSG_PLAIN, 54, CR_RED, 1.5, 0.15, 3.0, 0.5, 1.0);		
+		Delay(35);
+		GiveActorInventory(tid, "WrenchAmmo", (GetActorProperty(tid + 201, APROP_HEALTH) / 4));
+		Thing_Damage(tid + 201, 10000, 0);
+		GiveActorInventory(tid, "AllowSentryCreation", 1);
+	}
+	else if (n == 2 & GetActorProperty(tid + 101, APROP_HEALTH) > 0 ) {
+		SetFont("BIGFONT");
+		HudMessage(s:"Commencing self destruct sequence..."; HUDMSG_PLAIN, 55, CR_RED, 1.5, 0.1, 3.0, 0.5, 1.0);	
+		Delay(35);	
+		GiveActorInventory(tid, "WrenchAmmo", (GetActorProperty(tid + 101, APROP_HEALTH) / 4));
+		Thing_Damage(tid + 101, 10000, 0);
+		GiveActorInventory(tid, "AllowDispenserCreation", 1);
+	}
+}
+
+// Refund you if you suck
+Script 770 (int tid, int n)
+{
+	if (n == 3) {
+		if (ThingCount(T_NONE, tid + 501) == 0) {
+			SetHudSize(800, 600, 1);
+			HudMessage(s: "You failed placing your drone, please be more careful next time"; HUDMSG_PLAIN, NS_HealMsg, CR_WHITE, 400.0, 60.0, 5.0);
+			GiveActorInventory(tid, "WrenchAmmo", 50);
+			TakeActorInventory(tid, "DroneCapacity", 1);
+		}
+	}
+	else
+	if (n == 2) {
+		if (ThingCount(T_NONE, tid + 201) == 0) {
+			SetHudSize(800, 600, 1);
+			HudMessage(s: "You failed placing your sentry, please be more careful next time"; HUDMSG_PLAIN, NS_HealMsg, CR_WHITE, 400.0, 60.0, 5.0);
+			GiveActorInventory(tid, "WrenchAmmo", 200);
+			GiveActorInventory(tid, "AllowSentryCreation", 1);
+		}
+		else
+			GiveActorInventory(tid, "GotSentry", 1);
+	} else if (n == 1) {
+		if (ThingCount(T_NONE, tid + 101) == 0) {
+			SetHudSize(800, 600, 1);
+			HudMessage(s: "You failed placing your dispenser, please be more careful next time"; HUDMSG_PLAIN, NS_HealMsg, CR_WHITE, 400.0, 60.0, 5.0);
+			GiveActorInventory(tid, "WrenchAmmo", 100);
+			GiveActorInventory(tid, "AllowDispenserCreation", 1);
+		}
+		else
+			GiveActorInventory(tid, "GotDispenser", 1);
+	}
+}
+
+// Forces actor into the desired state
+Script 774 (int n)
+{
+	switch(n) 
+	{
+		case FAS_CyborgPulse:
+			SetActorState(ActivatorTID(), "CyborgPulse", true);
+			break;
+		case FAS_FrostShards:
+			SetActorState(ActivatorTID(), "IceRain", true);
+			break;
+		case FAS_ChokeVomit:
+			SetActorState(ActivatorTID(), "ChokeVomit", true);
+			break;
+		case FAS_ChokeBloodFeast:
+			SetActorState(ActivatorTID(), "ChokeFeast", true);
+			break;
+		case FAS_WarlockTeleport:
+			SetActorState(ActivatorTID(), "Teleportation", true);
+			break;
+	}
+}
+
+Script 779 (void) // Mohoph random
+{
+	GiveInventory("BusterAttack", random(1,9));
+}
+
+Script 780 (void) // Gender get
+{
+	SetResultValue(GetPlayerInfo(PlayerNumber(), PLAYERINFO_GENDER));
+}
+
+Script 781 (Int Morph)
+{	
+	If(Morph == 0)
+	{
+		Morph = random(2, 10);
+	}
+	If(Morph == 1)
+	{
+		if(!CheckInventory("NormalMohoph"))
+		{
+			UnMorphActor(0);
+			SetActorProperty(0, APROP_Invulnerable, 0); // Fix spawn invul morph exploit
+			GiveInventory("NormalMohoph", 1);
+			TakeInventory("KilledMarine",9999);
+			TakeInventory("KilledHunter",9999);
+			TakeInventory("KilledCyborg",9999);
+			TakeInventory("KilledGhostbuster",9999);
+			TakeInventory("KilledEngineer",9999);
+			TakeInventory("KilledWitchHunter",9999);
+			TakeInventory("KilledWarlock",9999);
+			TakeInventory("killedplanewalker",9999);
+			TakeInventory("KilledProtector",9999);
+			TakeInventory("GreenArmor2",9999);
+			GiveInventory("MorphActivator",1);
+			GiveInventory("MohophJustMorphed", 1);
+			ACS_ExecuteAlways(514, 0, -1);
+			Delay(35*3);
+			TakeInventory("MohophJustMorphed", 5);
+		}
+	}
+	If(Morph == 2)
+	{
+		MorphActor(0, "MarineMorph", "", INT_MAX, MRF_NEWTIDBEHAVIOUR | MRF_WHENINVULNERABLE, "", "");
+		Delay(10);
+	}
+	Else If(Morph == 3)
+	{
+		MorphActor(0, "HunterMorph", "", INT_MAX, MRF_NEWTIDBEHAVIOUR | MRF_WHENINVULNERABLE, "", "");
+		Delay(10);
+	}
+	Else If(Morph == 4)
+	{
+		MorphActor(0, "CyborgMorph", "", INT_MAX, MRF_NEWTIDBEHAVIOUR | MRF_WHENINVULNERABLE, "", "");
+		Delay(10);
+	}
+	Else If(Morph == 5)
+	{
+		MorphActor(0, "GhostBusterMorph", "", INT_MAX, MRF_NEWTIDBEHAVIOUR | MRF_WHENINVULNERABLE, "", "");
+		Delay(10);
+	}
+	Else If(Morph == 6)
+	{
+		MorphActor(0, "EngineerMorph", "", INT_MAX, MRF_NEWTIDBEHAVIOUR | MRF_WHENINVULNERABLE, "", "");
+		Delay(10);
+	}
+	Else If(Morph == 7)
+	{
+		MorphActor(0, "WitchMorph", "", INT_MAX, MRF_NEWTIDBEHAVIOUR | MRF_WHENINVULNERABLE, "", "");
+		Delay(10);
+	}
+	Else If(Morph == 8)
+	{
+		MorphActor(0, "WarlockMorph", "", INT_MAX, MRF_NEWTIDBEHAVIOUR | MRF_WHENINVULNERABLE, "", "");
+		Delay(10);
+	}
+	Else If(Morph == 9)
+	{
+		MorphActor(0, "PWalkerMorph", "", INT_MAX, MRF_NEWTIDBEHAVIOUR | MRF_WHENINVULNERABLE, "", "");
+		Delay(10);
+	}
+	Else If(Morph == 10)
+	{
+		MorphActor(0, "ProtectorMorph", "", INT_MAX, MRF_NEWTIDBEHAVIOUR | MRF_WHENINVULNERABLE, "", "");
+		Delay(10);
+	}	
+}
+
+Script 782 (void) // Mohoph fade
+{
+	Activatorsound("MohophStart",127);
+	FadeTo(180,20,0,1.0,0);
+	Delay(2);
+	FadeTo(0,0,0,0,1.0); 
+	Terminate;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+Script 800 (int i) NET CLIENTSIDE
+{
+	ConsoleCommand("playerclass random");
+	Player_SetTeam(i);
+}
+
+// Kill a specific person
+Script 801 (int tid) 
+{
+	Thing_Damage(tid, 1000, 0);
+}
+
+
+// Kill one of the two campers
+Script 802 (void)
+{
+	int i;
+	if (random(1,2) == 1)
+		for (i = 1000; i < 1032; i++)
+			if (GetActorProperty(i, APROP_HEALTH) > 0) {
+				Thing_Damage(i, 100000, 0);
+				Terminate;
+			}
+	else
+		for (i = 1031; i >= 1000; i--)
+			if (GetActorProperty(i, APROP_HEALTH) > 0) {
+				Thing_Damage(i, 100000, 0);
+				Terminate;
+			}
+}
+
+Script 850 (void) // maledict fade
+{
+	ActivatorSound("MaledictVictim", 112);
+	FadeTo (160, 0, 160, 0.6, 0.5);
+	Delay (3);
+	FadeTo (160, 0, 160, 0.0, 0.5);
+	Delay(32);
+}
+
+Script 851 (int wtid, int tid) // Maledict damaging function
+{
+	for( int i = 0; i <= 5; i++ )
+	{
+		if(GetActorProperty(tid, APROP_HEALTH) < 1)
+		{
+			Terminate;
+		}
+		Thing_Damage2(tid, random(10,15), "Maledict2");
+		GiveActorInventory(tid, "MaledictFader", 1);
+		Delay(35);
+	}
+}
+
+Script 853 (void)
+{
+	int n = CheckInventory("GhoulSouls");
+	GiveInventory("FireStaffAmmo", 5*(n+1)); // Because the item is actually being used, it removes 1
+	GiveInventory("LightningAmmo", n+1);
+	GiveInventory("HealthBonus", (4 * (n+1)));
+	GiveInventory("SoulKeeper", n+1);
+	
+	WarlockSouls[PlayerNumber()][1][0][0] += CheckInventory("SoulKeeper"); // remember value
+	WarlockSouls[PlayerNumber()][0][1][0] += CheckInventory("SoulKeeper");
+	WarlockSouls[PlayerNumber()][0][0][1] += CheckInventory("SoulKeeper");
+	
+	SetFont("BIGFONT");
+	HudMessage(s:"Consumed souls for \ci", d: 5 * (n+1), s: " Fire\c- and \cg", d: n+1, s: " Lightning mana\c-"; HUDMSG_PLAIN, 55, CR_CYAN, 1.5, 0.1, 3.0, 0.5, 1.0);		
+	
+	if (WarlockSouls[PlayerNumber()][1][0][0] >= 2)
+	{
+		WarlockSouls[PlayerNumber()][1][0][0] = WarlockSouls[PlayerNumber()][1][0][0]%2;
+		GiveInventory("BoneShieldItem", 1);
+		GiveInventory("SoulUnlockEffectGiver", 1);
+	}
+	if (WarlockSouls[PlayerNumber()][0][1][0] >= 4)
+	{
+		WarlockSouls[PlayerNumber()][0][1][0] = WarlockSouls[PlayerNumber()][0][1][0]%4;
+		GiveInventory("SkullRod2", 1);
+		GiveInventory("SoulUnlockEffectGiver", 1);
+		if(!CheckInventory("SkullRodItemCheck"))
+			SetWeapon("SkullRod2");
+		GiveInventory("SkullRodItemCheck", 1);
+	}
+	if (WarlockSouls[PlayerNumber()][0][0][1] >= 6)
+	{
+		WarlockSouls[PlayerNumber()][0][0][1] = WarlockSouls[PlayerNumber()][0][0][1]%6;
+		GiveInventory("TeleportationItem", 10);
+		GiveInventory("SoulUnlockEffectGiver", 1);
+		ACS_ExecuteAlways(713, 0, 121);
+	}
+	
+	TakeInventory("SoulKeeper", 999);
+	TakeInventory("GhoulSouls", 32);
+	FadeTo(64, 32, 255, 0.4, 0.15);
+	Delay(4);
+	FadeTo(255, 0, 0, 0.0, 0.15);
+}
+
+script 854 (void)
+{	
+	int wtid = ActivatorTID();
+	
+	for(int n; n <= MAXPLAYERS; n++)
+	{
+		if (!CheckActorInventory(TID_START+n, "MaledictCooldown"))
+			continue;
+		else
+			ACS_ExecuteAlways(851, 0, wtid, TID_START+n);
+	}
+}
+
+// Boneshield Explosion script
+script 855 (void)
+{
+	if(GetHealth() > 0 && CheckInventory("Armor") <= 0)
+	{
+		SetActorState(0, "BlowBone", true);
+		TakeInventory("WarlockBoneChecker", 1);
+		TakeInventory("Armor", 100);
+	}
+	else
+	{
+	    Spawn("BoneFx", GetActorX(0) + random(-64.0,64.0), GetActorY(0) + random(-64.0,64.0), GetActorZ(0) + 8.0);
+		Delay(2);
+		Spawn("BoneFx", GetActorX(0) + random(-64.0,64.0), GetActorY(0) + random(-64.0,64.0), GetActorZ(0) + 8.0);
+	    Delay(2);
+		Spawn("BoneFx", GetActorX(0) + random(-64.0,64.0), GetActorY(0) + random(-64.0,64.0), GetActorZ(0) + 8.0);
+	    Delay(2);
+		Spawn("BoneFx", GetActorX(0) + random(-64.0,64.0), GetActorY(0) + random(-64.0,64.0), GetActorZ(0) + 8.0);
+		Delay(2);
+		Spawn("BoneFx", GetActorX(0) + random(-64.0,64.0), GetActorY(0) + random(-64.0,64.0), GetActorZ(0) + 8.0);
+	    Delay(2);
+		Spawn("BoneFx", GetActorX(0) + random(-64.0,64.0), GetActorY(0) + random(-64.0,64.0), GetActorZ(0) + 8.0);	
+	}
+	
+	Delay(15);
+    if(CheckInventory("WarlockBoneChecker") == 0)
+		Terminate;
+	Restart;
+}
+
+Script 902 (int scriptStop, int val)
+{
+	TerminateScript[scriptStop] = val;
+	Log(s: "Termination of ", d: scriptStop, s: " value ", d: val);
+}
+
+// Gender check
+Script 903 (int control) 
+{
+	if(control == 1)
+	{
+		int mytarget = SetActivatortoTarget(0);
+		
+			switch(GetplayerInfo(mytarget, PLAYERINFO_GENDER)) {
+			case 0:
+				SetResultValue(0);
+			break;
+			case 1:
+				SetResultValue(2);
+			break;
+			case 2:
+				SetResultValue(1);
+			break;
+			}
+	}
+	else
+	{
+		int pn = PlayerNumber();
+		
+		switch(GetplayerInfo(pn, PLAYERINFO_GENDER)) {
+		case 0:
+			SetResultValue(0);
+		break;
+		case 1:
+			SetResultValue(2);
+		break;
+		case 2:
+			SetResultValue(1);
+		break;
+		}		
+	}
+}
+
+// PlanesWalker Scripts
+
+Script 906 (void)
+{
+	SetActorProperty(0, APROP_RENDERSTYLE, STYLE_TRANSLUCENT);
+	SetActorProperty(0, APROP_ALPHA, 0.05);
+	GiveInventory("PlaneWalkCheck", 1);
+	Delay(40);
+	SetActorProperty(0, APROP_ALPHA, 1.0);
+	SetActorProperty(0, APROP_RENDERSTYLE, STYLE_NORMAL);
+	TakeInventory("PlaneWalkCheck", 1);
+}
+
+Script 907 (int angle)
+{
+	SetActorVelocity(0, 0, 0, GetActorVelZ(0), 0, 1);
+	ThrustThing(angle*256/360, 22, 0, 0);
+}
+
+// The Universal cooldown display script
+Script 908 (int mode)
+{
+	int count;
+	setfont("smallfont");
+	switch(mode)
+	{
+			case 0:
+					count = PLANESWALKER_DASH_COOLDOWN;
+					for(int i = 0; i < count; ++i) {
+						hudmessage(s:"Dash Cooldown: \cd", d:count - i, s:"\c- " ; HUDMSG_PLAIN, 669, CR_GRAY, 1.5, -0.94, 5.5, 1.0, 1.0);
+						Delay(35);
+					}
+			break;
+			case 1:
+					count = PLANESWALKER_VORTEX_COOLDOWN;
+					for(int i = 0; i < count; ++i) {
+						hudmessage(s:"Vortex Cooldown: \cd", d:count - i, s:"\c- " ; HUDMSG_PLAIN, 670, CR_GRAY, 1.5, -0.96, 5.5, 1.0, 1.0);
+						Delay(35);
+					}
+			break;
+			case 2:
+			        count = FROSTBITE_MORTAR_COOLDOWN;
+					for(int i = 0; i < count; ++i) {
+						hudmessage(s:"Mortar Cooldown: \cd", d:count - i, s:"\c- " ; HUDMSG_PLAIN, 670, CR_WHITE, 1.5, -0.94, 5.5, 1.0, 1.0);
+						Delay(35);
+					}
+			break;
+			case 3:
+			        count = WARLOCK_MALEDICT_COOLDOWN;
+					for(int i = 0; i < count; ++i) {
+						hudmessage(s:"Malediction Cooldown: \cd", d:count - i, s:"\c- " ; HUDMSG_PLAIN, 670, CR_RED, 1.5, -0.94, 5.5, 1.0, 1.0);
+						Delay(35);
+					}			
+			break;
+			case 4:
+			        count = WARLOCK_SHADOWSTEP_COOLDOWN;
+					for(int i = 0; i < count; ++i) {
+						hudmessage(s:"Shadow Step Cooldown: \cd", d:count - i, s:"\c- " ; HUDMSG_PLAIN, 670, CR_PURPLE, 1.5, -0.96, 5.5, 1.0, 1.0);
+						Delay(35);
+					}
+			break;
+			case 5:
+					count = CREEPER_DRAINBALL_COOLDOWN;
+					for(int i = 0; i < count; ++i) {
+						hudmessage(s:"Drain Ball Cooldown: \cd", d:count - i, s:"\c-"; HUDMSG_PLAIN, 669, CR_RED, 1.5, -0.94, 1.5, 1.0, 1.0);
+						Delay(35);
+					}
+			break;
+			case 6:
+					count = NIGHTMARE_CLEAVE_COOLDOWN;
+					for(int i = 0; i < count; ++i) {
+						hudmessage(s:"Dark Cleave Cooldown: \cd", d:count - i, s:"\c-"; HUDMSG_PLAIN, 669, CR_GRAY, 1.5, -0.94, 1.5, 1.0, 1.0);
+						Delay(35);
+					}
+			break;
+			case 7:
+					count = NIGHTMARE_CLOAK_COOLDOWN;
+					for(int i = 0; i < count; ++i) {
+						hudmessage(s:"Stealth Cooldown: \cd", d:count - i, s:"\c-"; HUDMSG_PLAIN, 671, CR_GRAY, 1.5, -0.92, 1.5, 1.0, 1.0);
+						Delay(35);
+					}					
+			break;
+	}
+}
+
+// Check if he can use the proper mode
+Script 909 (void)
+{
+	if(CheckWeapon("CyborgPlasma-Pulse"))
+		SetResultValue(1);
+	else
+		SetResultValue(0);
+}
+
+script 910 (void)
+{
+	teleport(sjasteleporttid + activatortid(), 0, 1);
+	thing_remove(sjasteleportimg + activatortid());
+	
+	Delay(35*2);
+	TakeInventory("IJustTeleported", 1);
+}
+
+script 911 (int type) {
+	if(!type) {
+		spawn("TeleportDest2", getactorx(0), getactory(0), getactorz(0), sjasteleporttid + activatortid(), GetActorAngle(0) >> 8);
+		spawn("SjasTelePoint", getactorx(sjasteleporttid + activatortid()), getactory(sjasteleporttid + activatortid()), getactorz(sjasteleporttid + activatortid())+16.0, sjasteleportimg + activatortid(), GetActorAngle(0) >> 8);
+		takeinventory("sjasport", 1);
+		SetFont("SMALLFONT");
+		HudMessage(s:"The next time you get hit, you will teleport back to this spot.";
+		HUDMSG_PLAIN, 0, CR_White, 0.5, 0.9, 5.0);
+		giveinventory("sjasteleport", 1);
+	}
+	else {
+		// morgwyr time shift, calculate which index we are at 2 seconds before now
+		int curcounter = morg_time_counter[PlayerNumber()];
+		// current value of counter is here, it can be between 0 - 14 * TIME_ALLOWANCE (2 * 35 / 5) -- default, where 14 = 2 seconds and 0 is 0 second, 15 is 2.5 seconds etc (extra periods for exact updates)
+		int pnum = PlayerNumber();
+		GiveInventory("DisplaceEffectSpawner", 1);
+		SetPlayerProperty(0, 1, PROP_TOTALLYFROZEN);
+		for(int i = 1; i <= BASE_TIME_STORE; ++i) {
+		    int p = curcounter - i;
+			if(p < 0) p += MORG_TIME_STORAGE;
+			SetActorPosition(0, prev_pos[pnum][p].mpos.x, prev_pos[pnum][p].mpos.y, prev_pos[pnum][p].mpos.z, 0);
+			SetActorProperty(0, APROP_HEALTH, prev_pos[pnum][p].hp);
+			SetActorAngle(0, prev_pos[pnum][p].angle);
+			Delay(2);
+		}
+		Delay(1);
+		SetPlayerProperty(0, 0, PROP_TOTALLYFROZEN);
+		GiveInventory("DisplaceEffectSpawner", 1);
+		GiveInventory("MorgwyrShiftingDone", 1);
+	}
+}
+
+Script 912 (int type) // Morgwyr scripts
+{
+	if(type == 0) 
+		spawn("MorgDisplacer", getactorx(0), getactory(0), getactorz(0), MorgDisplacerTID + activatortid(), GetActorAngle(0) >> 8);
+	else
+	if(type == 1)
+	{
+		GiveInventory("DisplaceEffectSpawner", 1);
+		SetActorPosition(0, GetActorX(MorgDisplacerTID + ActivatorTID()), GetActorY(MorgDisplacerTID + ActivatorTID()), GetActorZ(MorgDisplacerTID + ActivatorTID()), 0);
+		Delay(1);
+		GiveInventory("DisplaceEffectSpawner", 1);
+		Thing_Remove(MorgDisplacerTID + ActivatorTID());
+	}
+	else
+	if(type == 2)
+	{
+		for(int i = 0; i < 5; i++)
+		{
+			GiveInventory("MorgDamageItem", 1);
+			Delay(2);
+		}
+	}
+}
+
+script 913 (int negroes) disconnect
+{
+	negroes = activatortid();
+	if(checkinventory("classid") == CLASSID_SJAS)
+	{
+		thing_remove(sjasteleportimg + negroes);
+	}
+}
+
+Script 914 (void)
+{
+		if(ThingCount(T_NONE, MorgDisplacerTID + ActivatorTID()))
+			SetResultValue(1);
+		else
+			SetResultValue(0);
+}
+
+Script 957 ENTER {
+    while(1) {
+		if(isPlayerClass(ActivatorTID(), CLASSID_MORGWYR) && CheckInventory("MorgwyrTimeShift")) {
+			int pnum = PlayerNumber();
+			prev_pos[pnum][morg_time_counter[pnum]].mpos.x = GetActorX(0);
+			prev_pos[pnum][morg_time_counter[pnum]].mpos.y = GetActorY(0);
+			prev_pos[pnum][morg_time_counter[pnum]].mpos.z = GetActorZ(0);
+			prev_pos[pnum][morg_time_counter[pnum]].hp = GetActorProperty(0, APROP_HEALTH);
+			prev_pos[pnum][morg_time_counter[pnum]].angle = GetActorAngle(0);
+//			print(d:prev_pos[pnum][morg_time_counter[pnum]].x, s:" ", d:prev_pos[pnum][morg_time_counter[pnum]].y, s:" ", d:prev_pos[pnum][morg_time_counter[pnum]].z);
+//			SpawnForced("MorgTimeTester", prev_pos[pnum][morg_time_counter[pnum]].x, prev_pos[pnum][morg_time_counter[pnum]].y, prev_pos[pnum][morg_time_counter[pnum]].z, 0, 0);
+			morg_time_counter[pnum] = (morg_time_counter[pnum] + 1) % MORG_TIME_STORAGE;
+			if(morg_time_counter[pnum] == BASE_TIME_STORE)
+			    TakeInventory("MorgTimePass", 1);
+		}
+		delay(TIME_SHIFT_SAVE_TICS);
+	}
+}
+
+Script 958 (int type) {
+    if(!type) {
+	    SetActorProperty(0, APROP_SPECIES, "Human");
+		GiveInventory("MakeThruSpecies", 1);
+	}
+	else {
+	    SetActorProperty(0, APROP_SPECIES, "Ghoul");
+		GiveInventory("ClearThruSpecies", 1);
+	}
+}
+
+Script 959 ENTER {
+    while(1) {
+	    int pc = getPlayerClass(ActivatorTID());
+	    if(pc == CLASSID_PROTECTOR) {
+			if(GetPlayerInput(PlayerNumber(), INPUT_BUTTONS) & BT_ALTATTACK &&
+			   !CheckInventory("ProtectorCantDash") &&
+			   !CheckInventory("CreeperStunCheck") &&
+			   !CheckInventory("ProtectorDashCooldown") &&
+			   CheckInventory("ProtectorDashEnergy") > PROTECTOR_DASH_ENERGY - 1
+			  ) 
+			  {
+				  GiveInventory("ProtectorDashing", 1);
+			  }
+		}
+		else if(pc == CLASSID_ENGINEER) {
+		    // check if he has pulverizer
+			if(CheckInventory("Pulverizer") && !CheckInventory("PulvCell")) {
+			    GiveInventory("PulvRecoverStack", 1);
+				if(CheckInventory("PulvRecoverStack") == ENGINEER_RECHARGE_COUNT) {
+				    TakeInventory("PulvRecoverStack", 0xFF);
+					LocalAmbientSound("weapons/cyborgcharge", 127);
+					GiveInventory("PulvCell", 1);
+				}
+			}
+			    
+		}
+		else if(pc == CLASSID_NIGHTMARE) {
+		    if(GetPlayerInput(PlayerNumber(), INPUT_BUTTONS) & BT_ALTATTACK && 
+			   !CheckInventory("NightmareCleaveCooldown") &&
+			   !CheckInventory("NightmareCleaving") &&
+			   !CheckInventory("IcefiendInvisible")
+			  )
+			    ACS_ExecuteAlways(972, 0);
+		}
+		Delay(5);
+	}
+}
+
+// Planeswalker energy regain
+Script 960 (void)
+{
+	if(GetActorProperty(0, APROP_HEALTH) > 0)
+	{
+		GiveInventory("AbilityEnergy", 5);
+		Delay(28);
+		Restart;
+	}
+}
+
+// nightmare attack script
+Script 972 (void) {
+    ActivatorSound("DarkCleave", 127);
+	GiveInventory("NightmareCleaving", 1);
+	ACS_ExecuteAlways(973, 0, 1);
+	for(int i = 0; i < 12; ++i) {
+		GiveInventory("NightmareCleaveItem", 1);
+		Delay(2);
+	}
+	ACS_ExecuteAlways(973, 0, 0);
+	GiveInventory("NightmareCleaveCooldown", 1);
+	ACS_executeAlways(908, 0, 6);
+	TakeInventory("NightmareCleaving", 1);
+}
+
+// mode 1 turns on, 0 turns off
+Script 973 (int mode) {
+    SetPlayerProperty(0, mode, PROP_TOTALLYFROZEN);
+}
+
+Script 974 (int tid)
+{
+	delay(1);
+	GiveActorInventory(tid-201, "MAKESENTRY", 1);
+}
+
+Script 975 (void)
+{
+	if(GetPlayerInput(-1, INPUT_BUTTONS) & BT_ATTACK)
+		SetResultValue(0);
+	else
+		SetResultValue(1);
+}
+
+// Mohoph scare
+Script 976 (void) CLIENTSIDE
+{
+		SetHudSize(1024,768,1);
+		SetFont("MOPHFACE");
+		HudMessage(s:"A"; HUDMSG_FADEOUT, 666, CR_UNTRANSLATED, 1050.0, 1580.0, 0.2, 0.5);
+		Terminate;
+}
+
+Script 977 (void)
+{
+	if(CheckInventory("Armor") >= 100)
+		SetResultValue(1);
+	else
+		SetResultValue(0);
+}
+
+// Sentry, Dispenser and Drone TID assigner
+Script 978 (int type)
+{
+	Thing_ChangeTID(1500, 1500+PlayerNumber()+1);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+//                             Old GVH Scripts                                //
+////////////////////////////////////////////////////////////////////////////////
+// Creeper Heal AND achievement
+Script 979 (void)
+{
+	if (TerminateScript[979])
+		Terminate;
+	if (GetActorProperty(ActivatorTID(), APROP_HEALTH) > 0 & GetActorProperty(ActivatorTID(), APROP_HEALTH) <= 5)
+		ACS_ExecuteAlways(713, 0, 44);
+    HealThing(70);
+}
+
+// Anticheat
+Script 980 OPEN CLIENTSIDE
+{
+    if(PlayerIsBot(PlayerNumber()))
+        Terminate;
+    If(GetCVar("r_drawtrans")==0)
+        ConsoleCommand("r_drawtrans 1");
+    If(GetCVar("noise")==1)
+        ConsoleCommand("noise 0");
+	If(GetCVar("hud_scale") != 0 & GetCVar("GVHSNS_AllowHudScale") != 1)
+		ConsoleCommand("hud_scale 0");
+    Delay(35);
+    Restart;
+}
+
+// The stopper of dash of protector + Sound
+
+Script 981 (int type)
+{
+	int p;
+	if(type == 2)
+	{
+		p = random(0, 4);
+		switch (p)
+		{
+			case 0:
+				ActivatorSound("Protector/Dash1", 127);
+				ActivatorSound("Protector/Dash1", 127);
+				ActivatorSound("Protector/Dash1", 127);
+			break;
+			case 1:
+				ActivatorSound("Protector/Dash2", 127);
+				ActivatorSound("Protector/Dash2", 127);
+				ActivatorSound("Protector/Dash2", 127);
+			break;
+			case 2:
+				ActivatorSound("Protector/Dash3", 127);
+				ActivatorSound("Protector/Dash3", 127);
+				ActivatorSound("Protector/Dash3", 127);
+			break;	
+			case 3:
+				ActivatorSound("Protector/Dash4", 127);
+				ActivatorSound("Protector/Dash4", 127);
+				ActivatorSound("Protector/Dash4", 127);
+			break;
+			case 4:
+				ActivatorSound("Protector/Dash5", 127);
+				ActivatorSound("Protector/Dash5", 127);
+				ActivatorSound("Protector/Dash5", 127);
+			break;
+		}
+	}
+	else
+	{
+		p = random(0, 5);
+		switch (p)
+		{
+			case 0:
+				ActivatorSound("MProtector/Dash1", 127);
+				ActivatorSound("MProtector/Dash1", 127);
+				ActivatorSound("MProtector/Dash1", 127);
+			break;
+			case 1:
+				ActivatorSound("MProtector/Dash2", 127);
+				ActivatorSound("MProtector/Dash2", 127);
+				ActivatorSound("MProtector/Dash2", 127);
+			break;
+			case 2:
+				ActivatorSound("MProtector/Dash3", 127);
+				ActivatorSound("MProtector/Dash3", 127);
+				ActivatorSound("MProtector/Dash3", 127);
+			break;	
+			case 3:
+				ActivatorSound("MProtector/Dash4", 127);
+				ActivatorSound("MProtector/Dash4", 127);
+				ActivatorSound("MProtector/Dash4", 127);
+			break;
+			case 4:
+				ActivatorSound("MProtector/Dash5", 127);
+				ActivatorSound("MProtector/Dash5", 127);
+				ActivatorSound("MProtector/Dash5", 127);
+			break;
+			case 5:
+				ActivatorSound("MProtector/Dash6", 127);
+				ActivatorSound("MProtector/Dash6", 127);
+				ActivatorSound("MProtector/Dash6", 127);			
+			break;
+		}	
+	}
+	GiveInventory("DashEffectSpawnerStart", 1);
+	GiveInventory("ProtDashCount", 1);
+	if(CheckInventory("UpgradeCount") >= 4)
+	{
+		GiveInventory("DashDamageSpawner", 1);
+		GiveInventory("DashSparkleSpawner", 1);
+	}
+	Delay(12);
+	SetPlayerProperty(0, 0, 0);
+	if(CheckInventory("UpgradeCount") >= 4)
+	{
+		GiveInventory("DashDamageSpawner", 1);	
+		GiveInventory("DashSparkleSpawner", 1);
+	}		
+	SetActorVelocity(0, GetActorVelX(0)/4.0, GetActorVelY(0)/4.0, GetActorVelZ(0), 0, 0);
+	GiveInventory("DashEffectSpawnerEnd", 1);
+}
+
+// Speed changing properties for Choke
+Script 982 (void) 
+{
+	if (TerminateScript[982])
+		Terminate;
+    SetActorProperty(0, APROP_Speed, 1.0);
+}
+
+// Speed changing properties for Choke
+script 983 (void) 
+{
+	if (TerminateScript[983])
+		Terminate;
+    SetActorProperty(0, APROP_Speed, 0.1);
+}
+
+// Anti-cheat script
+Script 984 RESPAWN
+{
+	if (TerminateScript[984])
+		Terminate;
+    if(PlayerIsBot(PlayerNumber()))
+    Terminate;
+    If(GetCVar("r_drawtrans")==0)
+        ConsoleCommand("r_drawtrans 1");
+    Delay(35);
+    Restart;
+}
+
+script 985 OPEN // LMS Tense music start
+{
+	if(GetCVar("winlimit") == 1) {
+		Terminate;
+	}
+	if(Bluescore()==GetCVar("winlimit") - 1) {
+		if(Redscore()==GetCVar("winlimit") - 1) {
+			SetMusic("D_LTHING");
+			terminate;
+		}
+	}
+	Delay(8);
+	restart;
+}
+
+//The Creeper stun script. Triggered upon being hit by a stun ball.
+Script 986 (void)
+{
+	if (TerminateScript[986])
+		Terminate;
+   SetPlayerProperty (0, 1, 0);
+   GiveInventory("CreeperStunCheck",1);
+   fadeto(255, 255, 255, 0.03, 0.0);
+   Playerstun[PlayerNumber()] = 42;
+   for(int i = 42; i > 0; i--)
+   {
+      if(i != Playerstun[PlayerNumber()])
+         terminate;
+      Playerstun[PlayerNumber()]--;
+      Delay(1);
+   }
+   Fadeto(255, 255, 255, 0.0, 0.0);
+   TakeInventory("CreeperStunCheck",1);
+   SetPlayerProperty (0, 0, 0);
+}
+
+// Creeper recharge (executed when standing still)
+Script 987 (void) 
+{
+	if (TerminateScript[987])
+		Terminate;
+    LocalAmbientSound("weapons/creepercharge",127);
+	if(CheckInventory("ClassID") == CLASSID_MORGWYR)
+		GiveInventory("MorgBatAmmo", 1);
+	else
+	if(CheckInventory("classID") == CLASSID_MOHOPH)
+		GiveInventory("MorphRangeAmmo", 1);
+	else { // Creeper
+		GiveInventory("GhoulAmmo",1);
+		TakeInventory("CreeperMaxCharge", 1);
+	}
+	fadeto(255, 255, 255, 0.03, 0.0);
+    Delay(5);
+    fadeto(255, 255, 255, 0.0, 0.0);
+}
+
+// Stops creeper popup
+Script 989 OPEN CLIENTSIDE
+{
+	if (TerminateScript[989])
+		Terminate;
+    if (GetCVAR("gvh_nocreeperpopup") == 0) {
+        ConsoleCommand("set gvh_nocreeperpopup 0");
+        ConsoleCommand("archivecvar gvh_nocreeperpopup");
+    }
+}
+
+Script 990 (void) // Drone return capacity
+{
+	int tid = GetActorProperty(0, APROP_MASTERTID);
+	if(CheckActorInventory(tid, "Igot2Drones"))
+		TakeActorInventory(tid, "Igot2Drones", 1);
+	else
+		TakeActorInventory(tid, "DroneCapacity", 1);
+}
+
+//Used for Cyborg's dashing, propels him in the assumed direction.
+Script 991 (int type)
+{
+	if (TerminateScript[991])
+		Terminate;
+    buttons[PlayerNumber()] = GetPlayerInput(PlayerNumber(), INPUT_BUTTONS);
+	int add;
+	
+	if(type == 0)
+	{
+		if (buttons[PlayerNumber()] & BT_FORWARD)
+		{
+			SetResultValue(1);
+			ThrustThing((GetActorAngle(ActivatorTID())*255)>>16, 35, 1, 0);
+			terminate;
+		}
+		if (buttons[PlayerNumber()] & BT_BACK)
+		{
+			SetResultValue(2);
+			ThrustThing((GetActorAngle(ActivatorTID())*255)>>16, -35, 1, 0);
+			terminate;
+		}
+		if (buttons[PlayerNumber()] & BT_MOVELEFT)
+		{
+			SetResultValue(3);
+			ThrustThing((GetActorAngle(ActivatorTID())*255)+64.0>>16, 35, 1, 0);
+			terminate;
+		}
+		if (buttons[PlayerNumber()] & BT_MOVERIGHT)
+		{
+			SetResultValue(4);
+			ThrustThing((GetActorAngle(ActivatorTID())*255)+192.0>>16, 35, 1, 0);
+			terminate;
+		}
+		SetResultValue(0);
+		ThrustThingZ(0,70,0,0);
+	}
+	else // Protector's dash
+	{
+		ACS_ExecuteAlways(981, 0, ACS_ExecuteWithResult(780, 0));
+		if(CheckInventory("UpgradeCount") >= 5)
+			add = PROT_PUSHADD;
+		else
+			add = 0;
+			
+		if (buttons[PlayerNumber()] & BT_FORWARD && buttons[PlayerNumber()] & BT_MOVELEFT)
+		{
+			ThrustThing((GetActorAngle(ActivatorTID())*255)+32.0>>16, PROT_PUSH+add, 1, 0);
+			terminate;
+		}
+		if (buttons[PlayerNumber()] & BT_FORWARD && buttons[PlayerNumber()] & BT_MOVERIGHT)
+		{
+			ThrustThing((GetActorAngle(ActivatorTID())*255)+224.0>>16, PROT_PUSH+add, 1, 0);
+			terminate;
+		}	
+		if (buttons[PlayerNumber()] & BT_FORWARD)
+		{
+			ThrustThing((GetActorAngle(ActivatorTID())*255)>>16, PROT_PUSH+add, 1, 0);
+			terminate;
+		}
+		if (buttons[PlayerNumber()] & BT_BACK && buttons[PlayerNumber()] & BT_MOVELEFT)
+		{
+			ThrustThing((GetActorAngle(ActivatorTID())*255)-32.0>>16, -PROT_PUSH-add, 1, 0);
+			terminate;
+		}
+		if (buttons[PlayerNumber()] & BT_BACK && buttons[PlayerNumber()] & BT_MOVERIGHT)
+		{
+			ThrustThing((GetActorAngle(ActivatorTID())*255)-224.0>>16, -PROT_PUSH-add, 1, 0);
+			terminate;
+		}				
+		if (buttons[PlayerNumber()] & BT_BACK)
+		{
+			ThrustThing((GetActorAngle(ActivatorTID())*255)>>16, -PROT_PUSH-add, 1, 0);
+			terminate;
+		}		
+		if (buttons[PlayerNumber()] & BT_MOVELEFT)
+		{
+			ThrustThing((GetActorAngle(ActivatorTID())*255)+64.0>>16, PROT_PUSH+add, 1, 0);
+			terminate;
+		}
+		if (buttons[PlayerNumber()] & BT_MOVERIGHT)
+		{
+			ThrustThing((GetActorAngle(ActivatorTID())*255)+192.0>>16, PROT_PUSH+add, 1, 0);
+			terminate;
+		}
+		ThrustThing((GetActorAngle(ActivatorTID())*255)>>16, PROT_PUSH+add, 1, 0);
+	}
+}
+
+Script 992 (int tid, int mode) // Engineer sentry return
+{
+	if(mode == 0)
+	{
+		GiveActorInventory(tid-201, "AllowSentryCreation", 1);
+		TakeActorInventory(tid-201, "GotSentry", 1);
+	}
+	else
+	{
+		GiveActorInventory(tid-101, "AllowDispenserCreation", 1);
+		TakeActorInventory(tid-101, "GotDispenser", 1);
+	}
+}
+
+//Warns the server to enable flags that are required to run GVH properly.
+Script 993 OPEN
+{
+    If(GameType() == 0)
+        terminate;
+    if(GetCVar("compat_noland") == 0)
+	{
+        Log(s:"SERVER WARNING: Enabling compat_noland flag to fix Sjas exploit.");
+		ConsoleCommand("set compat_noland 1");
+    }
+	if(GetCVar("compat_clientssendfullbuttoninfo") == 0)
+	{
+        Log(s:"SERVER WARNING: Enabling compat_clientssendfullbuttoninfo to fix Cyborg Dash.");
+		ConsoleCommand("set compat_clientssendfullbuttoninfo 1");
+	}
+	if(GetCVar("compat_wallrun") == 1)
+	{
+        Log(s:"SERVER WARNING: Disabling compat_wallrun to fix Jitterskull's movement.");
+		ConsoleCommand("set compat_wallrun 0");
+	}
+}
+
+// Drone translations
+Script 994 (void)
+{
+	int projtid = ActivatorTID();
+	SetActivatorToTarget(0);
+	Thing_SetTranslation(projtid, -1);
+}
+
+Script 995 (void) // Frosty heal check
+{
+	if(GetHealth() < 20)
+	{
+		GiveInventory("HealthBonus", 1);
+		GiveInventory("FrostyRegen", 1);
+		GiveInventory("CheckAchievements", 1);
+	}
+}
+
+// Ammo recharges for humans
+Script 996 (int x)
+{
+	if (TerminateScript[996])
+		Terminate;
+	
+	if (x == 0)
+	{
+	    if(CheckInventory("CyborgCharge") < 100 || CheckInventory("CyborgFuel") < 24) {
+		    int charge = 100 - CheckInventory("CyborgCharge");
+			if(charge > 5) charge = 5;
+		    GiveInventory("CyborgCharge", charge);
+			GiveInventory("CyborgChargeCount", 1);
+			GiveInventory("CheckAchievements", 1);
+			GiveInventory("CyborgFuel", 3);
+			LocalAmbientSound("weapons/cyborgcharge",127);
+			fadeto(0, 0, 255, 0.03, 0.0);
+			Delay(5);
+			fadeto(0, 0, 255, 0.0, 0.0);
+		}
+	}
+	else
+	if (x == 1)
+	{
+	    LocalAmbientSound("weapons/cyborgcharge",127);
+		GiveInventory("ShockCell", 5 + 3 * (CheckInventory("UpgradeCount") >= 1));
+		fadeto(127, 255, 127, 0.03, 0.0);
+		Delay(5);
+		fadeto(127, 255, 127, 0.0, 0.0);
+	}
+	else
+	if (x == 2)
+	{
+		if(CheckInventory("UpgradeCount") >= 3)
+		{
+			GiveInventory("PMissiles", 4);
+			LocalAmbientSound("weapons/cyborgcharge",127);
+			fadeto(255, 165, 0, 0.03, 0.0);
+			Delay(5);
+			fadeto(255, 165, 0, 0.0, 0.0);
+		}
+	}
+	else
+	if (x == 3)
+	{
+		if(CheckInventory("UpgradeCount") >= 3)
+		{
+			GiveInventory("LightningCell", 1);
+			LocalAmbientSound("weapons/cyborgcharge",127);
+			fadeto(135, 206, 250, 0.03, 0.0);
+			Delay(5);
+			fadeto(135, 206, 250, 0.0, 0.0);
+		}	
+	}
+}
+
+// Creeper popup
+Script 997 (void) CLIENTSIDE
+{
+	if (TerminateScript[997])
+		Terminate;
+    if(GetCVAR("gvh_nocreeperpopup") == 1)
+		terminate;
+    SetHudSize(1280, 1024, 1);
+    SetFont("CREEC0");
+    HudMessage(s:"A"; HUDMSG_FADEOUT, 666, CR_UNTRANSLATED, 1180.0, 1720.0, 0.2, 0.5);
+}
+
+// General Speed changing function
+Script 998 (int mode) 
+{
+    if(CheckInventory("ClassID") == CLASSID_MARINE)
+        SetActorProperty(0, APROP_Speed, 1.0);
+    if(CheckInventory("ClassID") == CLASSID_HUNTER)
+        SetActorProperty(0, APROP_Speed, 1.0);
+    if(CheckInventory("ClassID") == CLASSID_CYBORG)
+        SetActorProperty(0, APROP_Speed, 1.20);
+    if(CheckInventory("ClassID") == CLASSID_JITTERSKULL)
+        SetActorProperty(0, APROP_Speed, 0.52);
+	if(CheckInventory("ClassID") == CLASSID_WARLOCK)
+	{
+		if(mode == 1)
+			SetActorProperty(0, APROP_Speed, 0.0);
+		else
+			SetActorProperty(0, APROP_Speed, 1.0);
+	}
+	if(CheckInventory("ClassID") == CLASSID_MOHOPH) // Hack to make it work on hunter form
+	{
+		if(mode)
+			SetActorProperty(0, APROP_SPEED, 1.0);
+		else
+			SetActorProperty(0, APROP_SPEED, 0.5);
+	}
+}
+
+//Control of actors that toggles weapon slowdowns and speedups [Speed changing properties for Hunter/Jitterskull]
+Script 999 (void)
+{
+    if(CheckInventory("ClassID") == CLASSID_MARINE)
+        SetActorProperty(0, APROP_Speed, 0.5);
+    if(CheckInventory("ClassID") == CLASSID_HUNTER)
+        SetActorProperty(0, APROP_Speed, 0.5);
+    if(CheckInventory("ClassID") == CLASSID_CYBORG)
+        SetActorProperty(0, APROP_Speed, 1.0);
+    if(CheckInventory("ClassID") == CLASSID_JITTERSKULL || CheckInventory("ClassID") == CLASSID_MORGWYR)
+        SetActorProperty(0, APROP_Speed, 0.0001);
+}

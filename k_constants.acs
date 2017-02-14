@@ -1,0 +1,31 @@
+enum //ACS_ScriptNumbers
+{
+	KPATCH_SCRIPT_BASE_UNUSED = 650,
+	ACS_GetAngle,
+	ACS_GetInventory,
+	ACS_GetTargetInventory,
+	ACS_Cos,
+	ACS_Sin,
+	ACS_GetTargetVelX,
+	ACS_GetTargetVelY,
+	ACS_GetTargetVelZ,
+	
+	// Debug
+	ACS_PrintNumber,
+	
+	// Helper functions (probably not usable inside Decorate)
+	ACS_CheckInventory2,
+};
+
+enum //ACS_GetInventoryType
+{
+	INV_None = 0,
+	JSKULL_LungeAngle,
+};
+
+enum //IvanClassConstantsShit
+{
+	K_WM_ENG_NAIL = 36,
+	K_WM_ENG_PULV,
+	K_WM_ENG_WRENCH,
+};

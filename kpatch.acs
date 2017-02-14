@@ -1,0 +1,85 @@
+#library "kpatch"
+#include "zcommon.acs"
+#include "k_constants.acs"
+
+// Can't use functions since activator is not passed to functions (probably, too lazy to test properly, fuck actor functions in ACS)
+script ACS_CheckInventory2(int tid, int item)
+{
+	int count;
+	if(tid == 0)
+		count = CheckInventory(item);
+	else
+		count = CheckActorInventory(tid, item);
+	SetResultValue(count);
+}
+
+script ACS_GetAngle(int tid)
+{
+	SetResultValue(GetActorAngle(tid));
+}
+
+script ACS_GetInventory(int tid, int item)
+{
+	switch(item)
+	{
+		case JSKULL_LungeAngle:
+			SetResultValue(ACS_ExecuteWithResult(ACS_CheckInventory2, tid, "JitterAngleAtLunge"));
+			break;
+		
+		default:
+			SetResultValue(-1);
+			break;
+	}
+}
+
+script ACS_GetTargetInventory(int tid, int item)
+{
+	SetActivatorToTarget(tid);
+	SetResultValue( ACS_ExecuteWithResult(ACS_GetInventory, 0, item) );
+}
+
+script ACS_PrintNumber(int is_bold, int is_fixed_and_not_int, int number)
+{
+	if(is_bold)
+	{
+		if(is_fixed_and_not_int)
+			PrintBold(f:number);
+		else
+			PrintBold(d:number);
+	}
+	else
+	{
+		if(is_fixed_and_not_int)
+			Print(f:number);
+		else
+			Print(d:number);
+	}
+}
+
+script ACS_Cos(int angle)
+{
+	SetResultValue(cos(angle));
+}
+
+script ACS_Sin(int angle)
+{
+	SetResultValue(sin(angle));
+}
+
+script ACS_GetTargetVelX(int tid)
+{
+	SetActivatorToTarget(tid);
+	SetResultValue(GetActorVelX(0));
+}
+
+script ACS_GetTargetVelY(int tid)
+{
+	SetActivatorToTarget(tid);
+	SetResultValue(GetActorVelY(0));
+}
+
+script ACS_GetTargetVelZ(int tid)
+{
+	SetActivatorToTarget(tid);
+	SetResultValue(GetActorVelZ(0));
+}
