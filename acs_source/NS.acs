@@ -504,6 +504,12 @@ str MohophType[NS_CLASS_MAX/2] = { "\cg20% more damage!",
 //                                 Functions                                  //
 ////////////////////////////////////////////////////////////////////////////////
 
+// Returns the tid assigned to the player
+function int PlayerTid(int player)
+{
+	return TID_Start + player;
+}
+
 // Square root function
 function int sqrt_z(int number)
 {
