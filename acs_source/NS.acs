@@ -503,13 +503,6 @@ str MohophType[NS_CLASS_MAX/2] = { "\cg20% more damage!",
 ////////////////////////////////////////////////////////////////////////////////
 //                                 Functions                                  //
 ////////////////////////////////////////////////////////////////////////////////
-// Return the absolute
-Function int abs(int x) 
-{ 
-    if (x < 0) 
-        return -x; 
-    return x; 
-}
 
 // Square root function
 function int sqrt_z(int number)
@@ -535,62 +528,8 @@ function int sqrt_z(int number)
 	return oldAns;
 }
 
-// Returns the power value
-Function int power(int base, int exp)
-{
-	int y = 1;
-	while (exp-- > 0) 
-		y *= base;
-	return y;
-}
-
-// Gets the 2D distance
-Function int distance(int tid1, int tid2)
-{
-	int x, y;
-	x = (GetActorX(tid1) - GetActorX(tid2)) >> 16;
-	y = (GetActorY(tid1) - GetActorY(tid2)) >> 16;
-	return sqrt_z((x*x) + (y*y));
-}
-
-function int fdistance (int tid1, int tid2)
-{
-	int len;
-	int y = getactory(tid1) - getactory(tid2);
-	int x = getactorx(tid1) - getactorx(tid2);
-	int z = getactorz(tid1) - getactorz(tid2);
-
-	int ang = vectorangle(x,y);
-	if(((ang+0.125)%0.5) > 0.25) len = fixeddiv(y, sin(ang));
-	else len = fixeddiv(x, cos(ang));
-
-	ang = vectorangle(len, z);
-	if(((ang+0.125)%0.5) > 0.25) len = fixeddiv(z, sin(ang));
-	else len = fixeddiv(len, cos(ang));
-
-	return len;
-}
-
 // FROM AOW
 function int GetHealth (void) {return GetActorProperty (0, APROP_HEALTH);}
-
-// 3D distance function
-Function int distance3D(int x1, int y1, int z1, int tid)
-{
-	int len;
-	int x = (x1 * 1.0) - GetActorX(tid);
-	int y = (y1 * 1.0) - GetActorY(tid);
-	int z = (z1 * 1.0) - GetActorZ(tid);
-	int ang = VectorAngle(x, y);
-	if (((ang + 0.125) % 0.5) > 0.25) 
-		len = FixedDiv(y, sin(ang));
-	else len = FixedDiv(x, cos(ang));
-	ang = VectorAngle(len, z);
-	if (((ang + 0.125) % 0.5) > 0.25) 
-		len = FixedDiv(z, sin(ang));
-	else len = FixedDiv(len, cos(ang));
-	return (len / 1.0);
-}
 
 // Bypasses the random seed based on time
 Function int randInt(int low, int high)
@@ -606,20 +545,6 @@ Function int randIntEx(int low, int high, int val)
 	return (random(low + t + pc + val, high + t + pc + val) - t - val - pc);
 }
 
-// Returns a random number based off time and player numbers
-Function int randIntPC(int low, int high)
-{
-	int t = Timer();
-	int p = PlayerCount();
-	return (random(low + t + p, high + t + p) - t - p);
-}
-
-// Gets the player number from tid (start at 0)
-Function int playerNumberFromTid(int tid)
-{
-	return (tid - TID_Start);
-}
-
 // Gets the player class
 Function int getPlayerClass(int tid)
 {
@@ -630,12 +555,6 @@ Function int getPlayerClass(int tid)
 Function int isPlayerClass(int tid, int classNum)
 {
 	return (getPlayerClass(tid) == classNum);
-}
-
-// Returns the degrees from a fixed point angle
-Function int degreesFromFixed(int fp)
-{
-	return ((fp * 360) / 1.0);
 }
 
 // Returns ammo to give, -1 means it's maxed out for that dispenser
