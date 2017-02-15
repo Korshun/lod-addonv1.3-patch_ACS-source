@@ -169,7 +169,7 @@ int introchecker = 0;
 int botweapon = 0;
 int GBKills = 0;
 
-int PlayerTeamArray[64]; // 0 = null, 1 = human team, 2 = ghoul team
+int PlayerTeamArray[MaxPlayers]; // TODO: add constants. 0 = null, 1 = human team, 2 = ghoul team
 
 // Current page the player is browsing
 int alist_page[MaxPlayers];
@@ -188,7 +188,7 @@ Global int 36: HunterArrowCounter[];
 global int 52: gvh_listtoggle[];
 
 // Empty arrays
-int StartTime[33];
+int StartTime[MaxPlayers];
 int buttons[MaxPlayers];
 int Playerstun[MaxPlayers];
 int IcefiendCloaking[MaxPlayers];
@@ -503,6 +503,12 @@ str MohophType[NS_CLASS_MAX/2] = { "\cg20% more damage!",
 ////////////////////////////////////////////////////////////////////////////////
 //                                 Functions                                  //
 ////////////////////////////////////////////////////////////////////////////////
+
+// Returns the tid assigned to the player
+function int PlayerTid(int player)
+{
+	return TID_Start + player;
+}
 
 // Square root function
 function int sqrt_z(int number)
@@ -3364,17 +3370,17 @@ Script 801 (int tid)
 // Kill one of the two campers
 Script 802 (void)
 {
-	int i;
+	int player;
 	if (random(1,2) == 1)
-		for (i = 1000; i < 1032; i++)
-			if (GetActorProperty(i, APROP_HEALTH) > 0) {
-				Thing_Damage(i, 100000, 0);
+		for (player = 0; player < MaxPlayers; player++)
+			if (GetActorProperty(PlayerTid(player), APROP_HEALTH) > 0) {
+				Thing_Damage(PlayerTid(player), 100000, 0);
 				Terminate;
 			}
 	else
-		for (i = 1031; i >= 1000; i--)
-			if (GetActorProperty(i, APROP_HEALTH) > 0) {
-				Thing_Damage(i, 100000, 0);
+		for (player = MaxPlayers - 1; player >= 0; player--)
+			if (GetActorProperty(PlayerTid(player), APROP_HEALTH) > 0) {
+				Thing_Damage(PlayerTid(player), 100000, 0);
 				Terminate;
 			}
 }
