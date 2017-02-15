@@ -167,8 +167,6 @@ int alist_page[MaxPlayers];
 str alist_category;
 
 // Global variables
-Global int 0: GlobalKillTotal[];
-
 Global int 1: global_achieves[];
 
 Global int 33: HunterFireCounter[];
@@ -618,7 +616,6 @@ Function void resetPlayerData(int playerNum)
 	int i;
 	for(i = 0; i < NS_AchievementTotal; i++)
 		global_achieves[(playerNum*NS_AchievementTotal)+i] = 0;
-	GlobalKillTotal[playerNum] = 0;
 }
 
 // Checks if the achievement is unlocked
