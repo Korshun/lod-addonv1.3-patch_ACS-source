@@ -185,7 +185,6 @@ int StartTime[MaxPlayers];
 int buttons[MaxPlayers];
 int Playerstun[MaxPlayers];
 int IcefiendCloaking[MaxPlayers];
-int TotalMapKills[MaxPlayers + 1];
 int DispenserAmmoGiven[MaxPlayers][MaxPlayers][DSP_MaxSlot]; // Dispenser#, Player#, Ammo
 int TerminateScript[1000];
 int HookCount[MaxPlayers];
@@ -1854,11 +1853,9 @@ Script 723 RESPAWN
 // Increase Map kill count
 Script 724 (int tid)
 {
-	if (TerminateScript[724])
-		Terminate;
-	if (tid < TID_Start | tid > TID_Start + 32)
-		Terminate;
-	TotalMapKills[tid - TID_Start]++;
+	// This dummy script is called from decorate.
+	// It was supposed to increase variables in
+	// int TotalMapKills[MaxPlayers] array.
 }
 
 // Choke healer
