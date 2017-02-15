@@ -28,10 +28,6 @@
 #define sjasteleportimg 5190
 #define MorgDisplacerTID 6000
 
-// Advert constants
-#define NS_AdvertLineID 200
-#define NS_AdvertTotal 5
-
 // HUDMSG ID constants
 #define NS_AchieveListDisplayStart 1000
 #define NS_AchieveMsgBottomRank 14993
@@ -470,8 +466,6 @@ str NS_DeathHints[NS_DeathHintsTotal] = {	"A class' \cgSpecial Move\c- is used b
 											"Mohoph will heal himself to his maximum health each time he morphs to an enemy. However, he loses his resistances by doing so",
 											"Mohoph is immune to all curses or damage over time effects"
 										};
-
-str NS_Adverts[NS_AdvertTotal] = { "NSADV001", "NSADV002", "NSADV003", "NSADV004", "NSADV005" };
 
 str MohophPower[MaxPlayers][NS_CLASS_MAX/2] = { {0} };
 
