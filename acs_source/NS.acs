@@ -51,7 +51,6 @@
 #define NS_CyborgHUDID 15100
 #define NS_CyborgGridID 17000
 #define NS_AchieveListStartID 1200 // check for bug
-#define ALLYDISPLAYMAXDIST 3000
 
 // Achievement constants
 #define NS_AchievementTotal 140
