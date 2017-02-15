@@ -178,7 +178,6 @@ global int 52: gvh_listtoggle[];
 
 // Empty arrays
 int StartTime[MaxPlayers];
-int buttons[MaxPlayers];
 int Playerstun[MaxPlayers];
 int IcefiendCloaking[MaxPlayers];
 int DispenserAmmoGiven[MaxPlayers][MaxPlayers][DSP_MaxSlot]; // Dispenser#, Player#, Ammo
@@ -4055,30 +4054,30 @@ Script 991 (int type)
 {
 	if (TerminateScript[991])
 		Terminate;
-    buttons[PlayerNumber()] = GetPlayerInput(PlayerNumber(), INPUT_BUTTONS);
+    int buttons = GetPlayerInput(PlayerNumber(), INPUT_BUTTONS);
 	int add;
 	
 	if(type == 0)
 	{
-		if (buttons[PlayerNumber()] & BT_FORWARD)
+		if (buttons & BT_FORWARD)
 		{
 			SetResultValue(1);
 			ThrustThing((GetActorAngle(ActivatorTID())*255)>>16, 35, 1, 0);
 			terminate;
 		}
-		if (buttons[PlayerNumber()] & BT_BACK)
+		if (buttons & BT_BACK)
 		{
 			SetResultValue(2);
 			ThrustThing((GetActorAngle(ActivatorTID())*255)>>16, -35, 1, 0);
 			terminate;
 		}
-		if (buttons[PlayerNumber()] & BT_MOVELEFT)
+		if (buttons & BT_MOVELEFT)
 		{
 			SetResultValue(3);
 			ThrustThing((GetActorAngle(ActivatorTID())*255)+64.0>>16, 35, 1, 0);
 			terminate;
 		}
-		if (buttons[PlayerNumber()] & BT_MOVERIGHT)
+		if (buttons & BT_MOVERIGHT)
 		{
 			SetResultValue(4);
 			ThrustThing((GetActorAngle(ActivatorTID())*255)+192.0>>16, 35, 1, 0);
@@ -4095,42 +4094,42 @@ Script 991 (int type)
 		else
 			add = 0;
 			
-		if (buttons[PlayerNumber()] & BT_FORWARD && buttons[PlayerNumber()] & BT_MOVELEFT)
+		if (buttons & BT_FORWARD && buttons & BT_MOVELEFT)
 		{
 			ThrustThing((GetActorAngle(ActivatorTID())*255)+32.0>>16, PROT_PUSH+add, 1, 0);
 			terminate;
 		}
-		if (buttons[PlayerNumber()] & BT_FORWARD && buttons[PlayerNumber()] & BT_MOVERIGHT)
+		if (buttons & BT_FORWARD && buttons & BT_MOVERIGHT)
 		{
 			ThrustThing((GetActorAngle(ActivatorTID())*255)+224.0>>16, PROT_PUSH+add, 1, 0);
 			terminate;
 		}	
-		if (buttons[PlayerNumber()] & BT_FORWARD)
+		if (buttons & BT_FORWARD)
 		{
 			ThrustThing((GetActorAngle(ActivatorTID())*255)>>16, PROT_PUSH+add, 1, 0);
 			terminate;
 		}
-		if (buttons[PlayerNumber()] & BT_BACK && buttons[PlayerNumber()] & BT_MOVELEFT)
+		if (buttons & BT_BACK && buttons & BT_MOVELEFT)
 		{
 			ThrustThing((GetActorAngle(ActivatorTID())*255)-32.0>>16, -PROT_PUSH-add, 1, 0);
 			terminate;
 		}
-		if (buttons[PlayerNumber()] & BT_BACK && buttons[PlayerNumber()] & BT_MOVERIGHT)
+		if (buttons & BT_BACK && buttons & BT_MOVERIGHT)
 		{
 			ThrustThing((GetActorAngle(ActivatorTID())*255)-224.0>>16, -PROT_PUSH-add, 1, 0);
 			terminate;
 		}				
-		if (buttons[PlayerNumber()] & BT_BACK)
+		if (buttons & BT_BACK)
 		{
 			ThrustThing((GetActorAngle(ActivatorTID())*255)>>16, -PROT_PUSH-add, 1, 0);
 			terminate;
 		}		
-		if (buttons[PlayerNumber()] & BT_MOVELEFT)
+		if (buttons & BT_MOVELEFT)
 		{
 			ThrustThing((GetActorAngle(ActivatorTID())*255)+64.0>>16, PROT_PUSH+add, 1, 0);
 			terminate;
 		}
-		if (buttons[PlayerNumber()] & BT_MOVERIGHT)
+		if (buttons & BT_MOVERIGHT)
 		{
 			ThrustThing((GetActorAngle(ActivatorTID())*255)+192.0>>16, PROT_PUSH+add, 1, 0);
 			terminate;
