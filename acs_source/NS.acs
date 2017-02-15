@@ -86,8 +86,6 @@
 #define CLASSID_MOHOPH 17
 #define CLASSID_MORGWYR 18
 
-#define NS_CLASS_MAX 18
-
 // Ghostbuster upgrade constants
 #define GB_UPGRADE_SJAS 1
 #define GB_UPGRADE_JITTERSKULL 2
@@ -466,9 +464,9 @@ str NS_DeathHints[NS_DeathHintsTotal] = {	"A class' \cgSpecial Move\c- is used b
 											"Mohoph is immune to all curses or damage over time effects"
 										};
 
-str MohophPower[MaxPlayers][NS_CLASS_MAX/2] = { {0} };
+str MohophPower[MaxPlayers][9] = { {0} }; // All the code (and decorate) assumes size 9
 
-str MohophType[NS_CLASS_MAX/2] = { "\cg20% more damage!",
+str MohophType[9] = { "\cg20% more damage!",
 					  "\cf15% more speed!",
 					  "\cvFlight!",
 					  "\c[f1]Distraction!",
