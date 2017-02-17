@@ -29,13 +29,11 @@
 #define MorgDisplacerTID 6000
 
 // HUDMSG ID constants
-#define NS_AchieveListDisplayStart 1000
 #define NS_AchieveMsgBottomRank 14993
 #define NS_AchieveMsgBottomText 14994
 #define NS_AchieveMsgBottomName 14995
 #define NS_AchieveMsgBottomImage 14996
 #define NS_AchieveMsgBottomTitle 14997
-#define NS_AchieveImg 14998
 #define NS_AchieveMsgTop 14999
 #define NS_HudMessageID 15000
 #define NS_HudMessagePoisonID 15001
@@ -48,7 +46,6 @@
 #define NS_DispenserHudMsg 15101
 #define NS_SentryHudMsg 15009
 #define NS_HealMsg 15010
-#define NS_CyborgHUDID 15100
 #define NS_CyborgGridID 17000
 #define NS_AchieveListStartID 1200 // check for bug
 
