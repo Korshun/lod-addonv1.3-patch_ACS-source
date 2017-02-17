@@ -243,8 +243,6 @@ str NS_StringData[52] = { "\cjPrimary attack: \cdClaws (melee, powerful) \n\cjAl
 						  "\cjDummy Weapon: \cdYou are disguised! Your weapons do no damage!\nYou can transform back using your special power.\cj(\cdActivate Item\cj)"
 						};
 
-str NS_CyborgHud[4] = { "CYBVIS01", "CYBVIS02", "CYBVIS03", "CYBVIS04" };
-
 str NS_Achievement[NS_AchievementTotal][NS_ACHIEVETYPES] = {	{ "Still cleaning you up", "ACH_000", "Kill a creeper when your HP is less than 5", "\cgHard", "achievement\sound000" }, 
 																{ "Marksman", "ACH_001", "Kill 3 ghouls with lightning arrows", "\ckMedium", "achievement\sound001" }, 
 																{ "Ride the lightning", "ACH_002", "Kill 2 ghouls with 1 lightning arrow", "\c[rbw]IMPOSSIBRU", "achievement\sound002" } ,
