@@ -28,18 +28,12 @@
 #define sjasteleportimg 5190
 #define MorgDisplacerTID 6000
 
-// Advert constants
-#define NS_AdvertLineID 200
-#define NS_AdvertTotal 5
-
 // HUDMSG ID constants
-#define NS_AchieveListDisplayStart 1000
 #define NS_AchieveMsgBottomRank 14993
 #define NS_AchieveMsgBottomText 14994
 #define NS_AchieveMsgBottomName 14995
 #define NS_AchieveMsgBottomImage 14996
 #define NS_AchieveMsgBottomTitle 14997
-#define NS_AchieveImg 14998
 #define NS_AchieveMsgTop 14999
 #define NS_HudMessageID 15000
 #define NS_HudMessagePoisonID 15001
@@ -52,10 +46,8 @@
 #define NS_DispenserHudMsg 15101
 #define NS_SentryHudMsg 15009
 #define NS_HealMsg 15010
-#define NS_CyborgHUDID 15100
 #define NS_CyborgGridID 17000
 #define NS_AchieveListStartID 1200 // check for bug
-#define ALLYDISPLAYMAXDIST 3000
 
 // Achievement constants
 #define NS_AchievementTotal 140
@@ -90,8 +82,6 @@
 #define CLASSID_DEFILER 16
 #define CLASSID_MOHOPH 17
 #define CLASSID_MORGWYR 18
-
-#define NS_CLASS_MAX 18
 
 // Ghostbuster upgrade constants
 #define GB_UPGRADE_SJAS 1
@@ -162,22 +152,11 @@ struct morg_data {
 	int angle;
 };
 
-// Variables
-int scorecounter;
-int multikillcheck;
-int introchecker = 0;
-int botweapon = 0;
-int GBKills = 0;
-
-int PlayerTeamArray[MaxPlayers]; // TODO: add constants. 0 = null, 1 = human team, 2 = ghoul team
-
 // Current page the player is browsing
 int alist_page[MaxPlayers];
 str alist_category;
 
 // Global variables
-Global int 0: GlobalKillTotal[];
-
 Global int 1: global_achieves[];
 
 Global int 33: HunterFireCounter[];
@@ -189,11 +168,8 @@ global int 52: gvh_listtoggle[];
 
 // Empty arrays
 int StartTime[MaxPlayers];
-int buttons[MaxPlayers];
 int Playerstun[MaxPlayers];
 int IcefiendCloaking[MaxPlayers];
-int TotalMapKills[MaxPlayers + 1];
-int AchieveListOn[MaxPlayers + 1];
 int DispenserAmmoGiven[MaxPlayers][MaxPlayers][DSP_MaxSlot]; // Dispenser#, Player#, Ammo
 int TerminateScript[1000];
 int HookCount[MaxPlayers];
@@ -266,8 +242,6 @@ str NS_StringData[52] = { "\cjPrimary attack: \cdClaws (melee, powerful) \n\cjAl
 						  "\cjPrimary Attack: \cdExpander Beam (explosive beam, victims expand and explode) \n\cgSpecial Move: \cuDowngrade (Lose power to use Proton Pack again)",
 						  "\cjDummy Weapon: \cdYou are disguised! Your weapons do no damage!\nYou can transform back using your special power.\cj(\cdActivate Item\cj)"
 						};
-
-str NS_CyborgHud[4] = { "CYBVIS01", "CYBVIS02", "CYBVIS03", "CYBVIS04" };
 
 str NS_Achievement[NS_AchievementTotal][NS_ACHIEVETYPES] = {	{ "Still cleaning you up", "ACH_000", "Kill a creeper when your HP is less than 5", "\cgHard", "achievement\sound000" }, 
 																{ "Marksman", "ACH_001", "Kill 3 ghouls with lightning arrows", "\ckMedium", "achievement\sound001" }, 
@@ -485,11 +459,9 @@ str NS_DeathHints[NS_DeathHintsTotal] = {	"A class' \cgSpecial Move\c- is used b
 											"Mohoph is immune to all curses or damage over time effects"
 										};
 
-str NS_Adverts[NS_AdvertTotal] = { "NSADV001", "NSADV002", "NSADV003", "NSADV004", "NSADV005" };
+str MohophPower[MaxPlayers][9] = { {0} }; // All the code (and decorate) assumes size 9
 
-str MohophPower[MaxPlayers][NS_CLASS_MAX/2] = { {0} };
-
-str MohophType[NS_CLASS_MAX/2] = { "\cg20% more damage!",
+str MohophType[9] = { "\cg20% more damage!",
 					  "\cf15% more speed!",
 					  "\cvFlight!",
 					  "\c[f1]Distraction!",
@@ -629,7 +601,6 @@ Function void resetPlayerData(int playerNum)
 	int i;
 	for(i = 0; i < NS_AchievementTotal; i++)
 		global_achieves[(playerNum*NS_AchievementTotal)+i] = 0;
-	GlobalKillTotal[playerNum] = 0;
 }
 
 // Checks if the achievement is unlocked
@@ -1069,14 +1040,6 @@ Script 704 ENTER
 		MohophPower[PlayerNumber()][i] = 0;
 	
 	delay(1);
-	if(checkactorinventory(activatortid(),  "HumanTeam") == 1)
-	{
-		PlayerTeamArray[activatortid()-1000] = 1;
-	}
-	else if(checkactorinventory(activatortid(),  "GhoulTeam") == 1)
-	{
-		PlayerTeamArray[activatortid()-1000] = 2;
-	}
 	setactivator(activatortid());
 }
 
@@ -1194,7 +1157,6 @@ Script 709 DEATH
 	
 	for(int i; i <= 8; i ++)
 		MohophPower[PlayerNumber()][i] = 0;	
-	PlayerTeamArray[activatortid()-1000] = 0;
 }
 
 // Ghostbuster setup script
@@ -1799,7 +1761,6 @@ Script 719 (int num) DISCONNECT
 	WarlockSouls[num-1000][0][1][0] =	0;
 	WarlockSouls[num-1000][0][0][1] =	0;	
 	num = activatortid();
-	PlayerTeamArray[num-1000] = 0;	
 }
 
 // Disables Tip Display
@@ -1862,11 +1823,9 @@ Script 723 RESPAWN
 // Increase Map kill count
 Script 724 (int tid)
 {
-	if (TerminateScript[724])
-		Terminate;
-	if (tid < TID_Start | tid > TID_Start + 32)
-		Terminate;
-	TotalMapKills[tid - TID_Start]++;
+	// This dummy script is called from decorate.
+	// It was supposed to increase variables in
+	// int TotalMapKills[MaxPlayers] array.
 }
 
 // Choke healer
@@ -4081,30 +4040,30 @@ Script 991 (int type)
 {
 	if (TerminateScript[991])
 		Terminate;
-    buttons[PlayerNumber()] = GetPlayerInput(PlayerNumber(), INPUT_BUTTONS);
+    int buttons = GetPlayerInput(PlayerNumber(), INPUT_BUTTONS);
 	int add;
 	
 	if(type == 0)
 	{
-		if (buttons[PlayerNumber()] & BT_FORWARD)
+		if (buttons & BT_FORWARD)
 		{
 			SetResultValue(1);
 			ThrustThing((GetActorAngle(ActivatorTID())*255)>>16, 35, 1, 0);
 			terminate;
 		}
-		if (buttons[PlayerNumber()] & BT_BACK)
+		if (buttons & BT_BACK)
 		{
 			SetResultValue(2);
 			ThrustThing((GetActorAngle(ActivatorTID())*255)>>16, -35, 1, 0);
 			terminate;
 		}
-		if (buttons[PlayerNumber()] & BT_MOVELEFT)
+		if (buttons & BT_MOVELEFT)
 		{
 			SetResultValue(3);
 			ThrustThing((GetActorAngle(ActivatorTID())*255)+64.0>>16, 35, 1, 0);
 			terminate;
 		}
-		if (buttons[PlayerNumber()] & BT_MOVERIGHT)
+		if (buttons & BT_MOVERIGHT)
 		{
 			SetResultValue(4);
 			ThrustThing((GetActorAngle(ActivatorTID())*255)+192.0>>16, 35, 1, 0);
@@ -4121,42 +4080,42 @@ Script 991 (int type)
 		else
 			add = 0;
 			
-		if (buttons[PlayerNumber()] & BT_FORWARD && buttons[PlayerNumber()] & BT_MOVELEFT)
+		if (buttons & BT_FORWARD && buttons & BT_MOVELEFT)
 		{
 			ThrustThing((GetActorAngle(ActivatorTID())*255)+32.0>>16, PROT_PUSH+add, 1, 0);
 			terminate;
 		}
-		if (buttons[PlayerNumber()] & BT_FORWARD && buttons[PlayerNumber()] & BT_MOVERIGHT)
+		if (buttons & BT_FORWARD && buttons & BT_MOVERIGHT)
 		{
 			ThrustThing((GetActorAngle(ActivatorTID())*255)+224.0>>16, PROT_PUSH+add, 1, 0);
 			terminate;
 		}	
-		if (buttons[PlayerNumber()] & BT_FORWARD)
+		if (buttons & BT_FORWARD)
 		{
 			ThrustThing((GetActorAngle(ActivatorTID())*255)>>16, PROT_PUSH+add, 1, 0);
 			terminate;
 		}
-		if (buttons[PlayerNumber()] & BT_BACK && buttons[PlayerNumber()] & BT_MOVELEFT)
+		if (buttons & BT_BACK && buttons & BT_MOVELEFT)
 		{
 			ThrustThing((GetActorAngle(ActivatorTID())*255)-32.0>>16, -PROT_PUSH-add, 1, 0);
 			terminate;
 		}
-		if (buttons[PlayerNumber()] & BT_BACK && buttons[PlayerNumber()] & BT_MOVERIGHT)
+		if (buttons & BT_BACK && buttons & BT_MOVERIGHT)
 		{
 			ThrustThing((GetActorAngle(ActivatorTID())*255)-224.0>>16, -PROT_PUSH-add, 1, 0);
 			terminate;
 		}				
-		if (buttons[PlayerNumber()] & BT_BACK)
+		if (buttons & BT_BACK)
 		{
 			ThrustThing((GetActorAngle(ActivatorTID())*255)>>16, -PROT_PUSH-add, 1, 0);
 			terminate;
 		}		
-		if (buttons[PlayerNumber()] & BT_MOVELEFT)
+		if (buttons & BT_MOVELEFT)
 		{
 			ThrustThing((GetActorAngle(ActivatorTID())*255)+64.0>>16, PROT_PUSH+add, 1, 0);
 			terminate;
 		}
-		if (buttons[PlayerNumber()] & BT_MOVERIGHT)
+		if (buttons & BT_MOVERIGHT)
 		{
 			ThrustThing((GetActorAngle(ActivatorTID())*255)+192.0>>16, PROT_PUSH+add, 1, 0);
 			terminate;
